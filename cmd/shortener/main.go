@@ -10,8 +10,7 @@ var urlStore = make(map[string]string)
 var idCounter = 0
 
 func main() {
-	http.HandleFunc("/", shortenURL)
-	http.HandleFunc("/redirect/", redirectURL)
+	http.HandleFunc("/", handleURL)
 
 	err := http.ListenAndServe(`:8080`, nil)
 	if err != nil {
@@ -19,17 +18,24 @@ func main() {
 	}
 }
 
-func shortenURL(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Метод не POST", http.StatusBadRequest)
-		return
+func handleURL(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		shortenURL(w, r)
+	} else if r.Method == http.MethodGet {
+		redirectURL(w, r)
+	} else {
+		http.Error(w, "Метод не поддерживается", http.StatusMethodNotAllowed)
 	}
+}
+
+func shortenURL(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil || len(body) == 0 {
 		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
 		return
 	}
+
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
@@ -48,7 +54,7 @@ func shortenURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func redirectURL(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Path[len("/redirect/"):]
+	id := r.URL.Path[len("/"):]
 
 	url, exists := urlStore[id]
 	if !exists {
