@@ -39,7 +39,6 @@ func shortenURL(w http.ResponseWriter, r *http.Request) {
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-
 		}
 	}(r.Body)
 
