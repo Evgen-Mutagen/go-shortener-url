@@ -60,28 +60,22 @@ func extractHostPort(url string) string {
 }
 
 func shortenURL(w http.ResponseWriter, r *http.Request) {
-	body, _ := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
+	if err != nil || len(body) == 0 {
+		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
+		return
+	}
+
 	defer r.Body.Close()
 
-	//
 	url := string(body)
-	http.Error(w, "q "+r.Host+" "+r.Method+" "+url, http.StatusBadRequest)
-	//body, err := io.ReadAll(r.Body)
-	//if err != nil || len(body) == 0 {
-	//	http.Error(w, "Некорректный запрос", http.StatusBadRequest)
-	//	return
-	//}
-	//
-	//defer r.Body.Close()
-	//
-	//url := string(body)
-	//
-	//id := generateID()
-	//urlStore[id] = url
-	//
-	//w.WriteHeader(http.StatusCreated)
-	//w.Header().Set("Content-Type", "text/plain")
-	//w.Write([]byte(cfg.BaseURL + id))
+
+	id := generateID()
+	urlStore[id] = url
+
+	w.WriteHeader(http.StatusCreated)
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte(cfg.BaseURL + id))
 }
 
 func redirectURL(w http.ResponseWriter, r *http.Request) {
