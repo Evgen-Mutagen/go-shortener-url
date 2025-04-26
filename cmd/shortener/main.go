@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 )
@@ -10,26 +11,18 @@ var urlStore = make(map[string]string)
 var idCounter = 0
 
 func main() {
-	http.HandleFunc("/", handleURL)
+	r := chi.NewRouter()
 
-	err := http.ListenAndServe(`:8080`, nil)
+	r.Post("/", shortenURL)
+	r.Get("/{id}", redirectURL)
+
+	err := http.ListenAndServe(`:8080`, r)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func handleURL(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost {
-		shortenURL(w, r)
-	} else if r.Method == http.MethodGet {
-		redirectURL(w, r)
-	} else {
-		http.Error(w, "Метод не поддерживается", http.StatusMethodNotAllowed)
-	}
-}
-
 func shortenURL(w http.ResponseWriter, r *http.Request) {
-
 	body, err := io.ReadAll(r.Body)
 	if err != nil || len(body) == 0 {
 		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
@@ -49,7 +42,7 @@ func shortenURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func redirectURL(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Path[len("/"):]
+	id := chi.URLParam(r, "id")
 
 	url, exists := urlStore[id]
 	if !exists {
