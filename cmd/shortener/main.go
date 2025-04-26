@@ -34,16 +34,16 @@ func main() {
 		}
 	}()
 
-	if extractHostPort(cfg.BaseURL) != cfg.ServerAddress {
-		redirectAddr := extractHostPort(cfg.BaseURL)
-		fmt.Printf("Starting redirect server on %s...\n", redirectAddr)
-		go func() {
-			err := http.ListenAndServe(redirectAddr, r)
-			if err != nil {
-				panic(err)
-			}
-		}()
-	}
+	//if extractHostPort(cfg.BaseURL) != cfg.ServerAddress {
+	//	redirectAddr := extractHostPort(cfg.BaseURL)
+	//	fmt.Printf("Starting redirect server on %s...\n", redirectAddr)
+	//	go func() {
+	//		err := http.ListenAndServe(redirectAddr, r)
+	//		if err != nil {
+	//			panic(err)
+	//		}
+	//	}()
+	//}
 
 	select {}
 }
