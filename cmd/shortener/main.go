@@ -34,16 +34,16 @@ func main() {
 		}
 	}()
 
-	//if extractHostPort(cfg.BaseURL) != cfg.ServerAddress {
-	//	redirectAddr := extractHostPort(cfg.BaseURL)
-	//	fmt.Printf("Starting redirect server on %s...\n", redirectAddr)
-	//	go func() {
-	//		err := http.ListenAndServe(redirectAddr, r)
-	//		if err != nil {
-	//			panic(err)
-	//		}
-	//	}()
-	//}
+	if extractHostPort(cfg.BaseURL) != cfg.ServerAddress {
+		redirectAddr := extractHostPort(cfg.BaseURL)
+		fmt.Printf("Starting redirect server on %s...\n", redirectAddr)
+		go func() {
+			err := http.ListenAndServe(redirectAddr, r)
+			if err != nil {
+				panic(err)
+			}
+		}()
+	}
 
 	select {}
 }
@@ -60,22 +60,28 @@ func extractHostPort(url string) string {
 }
 
 func shortenURL(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
-	if err != nil || len(body) == 0 {
-		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
-		return
-	}
-
+	body, _ := io.ReadAll(r.Body)
 	defer r.Body.Close()
 
+	//
 	url := string(body)
-
-	id := generateID()
-	urlStore[id] = url
-
-	w.WriteHeader(http.StatusCreated)
-	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte(cfg.BaseURL + id))
+	http.Error(w, "q "+r.Host+" "+r.Method+" "+url, http.StatusBadRequest)
+	//body, err := io.ReadAll(r.Body)
+	//if err != nil || len(body) == 0 {
+	//	http.Error(w, "Некорректный запрос", http.StatusBadRequest)
+	//	return
+	//}
+	//
+	//defer r.Body.Close()
+	//
+	//url := string(body)
+	//
+	//id := generateID()
+	//urlStore[id] = url
+	//
+	//w.WriteHeader(http.StatusCreated)
+	//w.Header().Set("Content-Type", "text/plain")
+	//w.Write([]byte(cfg.BaseURL + id))
 }
 
 func redirectURL(w http.ResponseWriter, r *http.Request) {
