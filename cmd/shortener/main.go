@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
+	"strings"
 )
 
 var urlStore = make(map[string]string)
@@ -26,10 +27,36 @@ func main() {
 
 	fmt.Printf("Starting server on %s...\n", cfg.ServerAddress)
 
-	err = http.ListenAndServe(cfg.ServerAddress, r)
-	if err != nil {
-		panic(err)
+	go func() {
+		err := http.ListenAndServe(cfg.ServerAddress, r)
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	if extractHostPort(cfg.BaseURL) != cfg.ServerAddress {
+		redirectAddr := extractHostPort(cfg.BaseURL)
+		fmt.Printf("Starting redirect server on %s...\n", redirectAddr)
+		go func() {
+			err := http.ListenAndServe(redirectAddr, r)
+			if err != nil {
+				panic(err)
+			}
+		}()
 	}
+
+	select {}
+}
+
+func extractHostPort(url string) string {
+
+	url = strings.TrimPrefix(url, "http://")
+	url = strings.TrimPrefix(url, "https://")
+
+	if idx := strings.Index(url, "/"); idx != -1 {
+		url = url[:idx]
+	}
+	return url
 }
 
 func shortenURL(w http.ResponseWriter, r *http.Request) {
