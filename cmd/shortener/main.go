@@ -75,7 +75,7 @@ func shortenURL(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte(fmt.Sprintf("%s/%s", cfg.BaseURL, id)))
+	w.Write([]byte(fmt.Sprintf("%s/%s", strings.TrimSuffix(cfg.BaseURL, "/"), id)))
 }
 
 func redirectURL(w http.ResponseWriter, r *http.Request) {
