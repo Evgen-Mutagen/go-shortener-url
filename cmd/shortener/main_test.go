@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"github.com/Evgen-Mutagen/go-shortener-url/cmd/config"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"net/http"
@@ -16,12 +17,13 @@ func Test_redirectURL(t *testing.T) {
 	urlStore[id] = "https://google.com"
 
 	tests := []struct {
-		name         string
-		id           string
-		expectedCode int
+		name             string
+		id               string
+		expectedCode     int
+		expectedLocation string
 	}{
 		{
-			name: "Valid ID", id: id, expectedCode: http.StatusTemporaryRedirect,
+			name: "Valid ID", id: id, expectedCode: http.StatusTemporaryRedirect, expectedLocation: "https://google.com",
 		},
 		{
 			name: "Invalid ID", id: "invalid-id", expectedCode: http.StatusBadRequest,
@@ -43,22 +45,29 @@ func Test_redirectURL(t *testing.T) {
 			assert.Equal(t, tt.expectedCode, w.Code)
 
 			if tt.expectedCode == http.StatusTemporaryRedirect {
-				assert.Equal(t, "https://google.com", w.Header().Get("Location"))
+				assert.Equal(t, tt.expectedLocation, w.Header().Get("Location"))
 			}
 		})
 	}
 }
 
 func Test_shortenURL(t *testing.T) {
+	cfg = &config.Config{
+		ServerAddress: "localhost:8080",
+		BaseURL:       "http://localhost:8080/",
+	}
+
 	tests := []struct {
-		name         string
-		body         string
-		expectedCode int
+		name                   string
+		body                   string
+		expectedCode           int
+		expectLocationContains string
 	}{
 		{
-			name:         "Valid URL",
-			body:         "https://google.com",
-			expectedCode: http.StatusCreated,
+			name:                   "Valid URL",
+			body:                   "https://google.com",
+			expectedCode:           http.StatusCreated,
+			expectLocationContains: "http://localhost:8080/",
 		},
 		{
 			name:         "Empty body",
@@ -66,9 +75,10 @@ func Test_shortenURL(t *testing.T) {
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			name:         "Invalid request body",
-			body:         "invalid-url",
-			expectedCode: http.StatusCreated,
+			name:                   "Invalid request body",
+			body:                   "invalid-url",
+			expectedCode:           http.StatusCreated,
+			expectLocationContains: "http://localhost:8080/",
 		},
 	}
 
@@ -83,7 +93,7 @@ func Test_shortenURL(t *testing.T) {
 
 			if tt.expectedCode == http.StatusCreated {
 				location := w.Body.String()
-				assert.Contains(t, location, "http://localhost:8080/")
+				assert.Contains(t, location, tt.expectLocationContains)
 			}
 		})
 	}

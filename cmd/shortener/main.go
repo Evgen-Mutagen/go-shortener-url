@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/Evgen-Mutagen/go-shortener-url/cmd/config"
 	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
@@ -9,14 +10,23 @@ import (
 
 var urlStore = make(map[string]string)
 var idCounter = 0
+var cfg *config.Config
 
 func main() {
+	var err error
+	cfg, err = config.LoadConfig()
+	if err != nil {
+		panic(err)
+	}
+
 	r := chi.NewRouter()
 
 	r.Post("/", shortenURL)
 	r.Get("/{id}", redirectURL)
 
-	err := http.ListenAndServe(`:8080`, r)
+	fmt.Printf("Starting server on %s...\n", cfg.ServerAddress)
+
+	err = http.ListenAndServe(cfg.ServerAddress, r)
 	if err != nil {
 		panic(err)
 	}
@@ -38,7 +48,7 @@ func shortenURL(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte("http://localhost:8080/" + id))
+	w.Write([]byte(cfg.BaseURL + id))
 }
 
 func redirectURL(w http.ResponseWriter, r *http.Request) {
