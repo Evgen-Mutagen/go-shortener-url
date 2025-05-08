@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/Evgen-Mutagen/go-shortener-url/cmd/config"
+	"github.com/Evgen-Mutagen/go-shortener-url/config"
 	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"

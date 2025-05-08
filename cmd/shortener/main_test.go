@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"github.com/Evgen-Mutagen/go-shortener-url/cmd/config"
+	"github.com/Evgen-Mutagen/go-shortener-url/config"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"net/http"
