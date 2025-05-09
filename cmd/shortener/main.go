@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/Evgen-Mutagen/go-shortener-url/config"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
 	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
@@ -11,11 +11,11 @@ import (
 
 var urlStore = make(map[string]string)
 var idCounter = 0
-var cfg *config.Config
+var cfg *configs.Config
 
 func main() {
 	var err error
-	cfg, err = config.LoadConfig()
+	cfg, err = configs.LoadConfig()
 	if err != nil {
 		panic(err)
 	}

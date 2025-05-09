@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"github.com/Evgen-Mutagen/go-shortener-url/config"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"net/http"
@@ -52,7 +52,7 @@ func Test_redirectURL(t *testing.T) {
 }
 
 func Test_shortenURL(t *testing.T) {
-	cfg = &config.Config{
+	cfg = &configs.Config{
 		ServerAddress: "localhost:8080",
 		BaseURL:       "http://localhost:8080/",
 	}
