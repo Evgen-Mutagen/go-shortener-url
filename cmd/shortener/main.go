@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/logger"
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"strings"
@@ -20,8 +22,12 @@ func main() {
 		panic(err)
 	}
 
+	loggerInstance, _ := zap.NewProduction()
+	defer loggerInstance.Sync()
+
 	r := chi.NewRouter()
 
+	r.Use(logger.WithLogging(loggerInstance))
 	r.Post("/", shortenURL)
 	r.Get("/{id}", redirectURL)
 
