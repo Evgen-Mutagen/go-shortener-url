@@ -123,8 +123,8 @@ func shortenURLJSON(w http.ResponseWriter, r *http.Request) {
 		Result: fmt.Sprintf("%s/%s", strings.TrimSuffix(cfg.BaseURL, "/"), id),
 	}
 
-	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Ошибка при формировании ответа", http.StatusInternalServerError)

@@ -110,12 +110,14 @@ func Test_shortenURLJSON(t *testing.T) {
 		name                 string
 		body                 string
 		expectedCode         int
+		expectedContentType  string
 		expectResultContains string
 	}{
 		{
 			name:                 "Valid URL",
 			body:                 `{"url":"https://google.com"}`,
 			expectedCode:         http.StatusCreated,
+			expectedContentType:  "application/json",
 			expectResultContains: "http://localhost:8080/",
 		},
 		{
@@ -140,6 +142,7 @@ func Test_shortenURLJSON(t *testing.T) {
 				err := json.Unmarshal(w.Body.Bytes(), &response)
 				assert.NoError(t, err)
 				assert.Contains(t, response.Result, tt.expectResultContains)
+				assert.Equal(t, tt.expectedContentType, w.Header().Get("Content-Type"))
 			}
 		})
 	}
