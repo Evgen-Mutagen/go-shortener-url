@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/logger"
@@ -14,6 +15,14 @@ import (
 var urlStore = make(map[string]string)
 var idCounter = 0
 var cfg *configs.Config
+
+type ShortenRequest struct {
+	URL string `json:"url"`
+}
+
+type ShortenResponse struct {
+	Result string `json:"result"`
+}
 
 func main() {
 	var err error
@@ -29,6 +38,7 @@ func main() {
 
 	r.Use(logger.WithLogging(loggerInstance))
 	r.Post("/", shortenURL)
+	r.Post("/api/shorten", shortenURLJSON)
 	r.Get("/{id}", redirectURL)
 
 	fmt.Printf("Starting server on %s...\n", cfg.ServerAddress)
@@ -95,6 +105,30 @@ func redirectURL(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", url)
 	w.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func shortenURLJSON(w http.ResponseWriter, r *http.Request) {
+	var req ShortenRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.URL == "" {
+		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
+		return
+	}
+
+	defer r.Body.Close()
+
+	id := generateID()
+	urlStore[id] = req.URL
+
+	response := ShortenResponse{
+		Result: fmt.Sprintf("%s/%s", strings.TrimSuffix(cfg.BaseURL, "/"), id),
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Ошибка при формировании ответа", http.StatusInternalServerError)
+	}
 }
 
 func generateID() string {

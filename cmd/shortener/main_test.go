@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -94,6 +95,51 @@ func Test_shortenURL(t *testing.T) {
 			if tt.expectedCode == http.StatusCreated {
 				location := w.Body.String()
 				assert.Contains(t, location, tt.expectLocationContains)
+			}
+		})
+	}
+}
+
+func Test_shortenURLJSON(t *testing.T) {
+	cfg = &configs.Config{
+		ServerAddress: "localhost:8080",
+		BaseURL:       "http://localhost:8080/",
+	}
+
+	tests := []struct {
+		name                 string
+		body                 string
+		expectedCode         int
+		expectResultContains string
+	}{
+		{
+			name:                 "Valid URL",
+			body:                 `{"url":"https://google.com"}`,
+			expectedCode:         http.StatusCreated,
+			expectResultContains: "http://localhost:8080/",
+		},
+		{
+			name:         "Empty body",
+			body:         `{}`,
+			expectedCode: http.StatusBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewBufferString(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			shortenURLJSON(w, req)
+
+			assert.Equal(t, tt.expectedCode, w.Code)
+
+			if tt.expectedCode == http.StatusCreated {
+				var response ShortenResponse
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				assert.NoError(t, err)
+				assert.Contains(t, response.Result, tt.expectResultContains)
 			}
 		})
 	}
