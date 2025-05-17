@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/urlservice"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"net/http"
@@ -14,30 +15,37 @@ import (
 	"testing"
 )
 
-func setupTestStorage(t *testing.T) *storage.Storage {
+func setupTestService(t *testing.T) (*urlservice.URLService, *storage.Storage) {
 	tmpFile, err := os.CreateTemp("", "test_storage_*.json")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
 	tmpFile.Close()
 
-	s, err := storage.NewStorage(tmpFile.Name())
+	cfg := &configs.Config{
+		ServerAddress: "localhost:8080",
+		BaseURL:       "http://localhost:8080/",
+	}
+
+	storage, err := storage.NewStorage(tmpFile.Name())
 	if err != nil {
 		t.Fatalf("Failed to create storage: %v", err)
 	}
+
+	service := urlservice.New(cfg, storage)
 
 	t.Cleanup(func() {
 		os.Remove(tmpFile.Name())
 	})
 
-	return s
+	return service, storage
 }
 
 func Test_redirectURL(t *testing.T) {
-	testStorage := setupTestStorage(t)
-	urlStore = testStorage
-	id := generateID()
-	if err := urlStore.Save(id, "https://google.com"); err != nil {
+	service, storage := setupTestService(t)
+
+	id := "testID123"
+	if err := storage.Save(id, "https://google.com"); err != nil {
 		t.Fatalf("Failed to save test URL: %v", err)
 	}
 
@@ -48,10 +56,15 @@ func Test_redirectURL(t *testing.T) {
 		expectedLocation string
 	}{
 		{
-			name: "Valid ID", id: id, expectedCode: http.StatusTemporaryRedirect, expectedLocation: "https://google.com",
+			name:             "Valid ID",
+			id:               id,
+			expectedCode:     http.StatusTemporaryRedirect,
+			expectedLocation: "https://google.com",
 		},
 		{
-			name: "Invalid ID", id: "invalid-id", expectedCode: http.StatusBadRequest,
+			name:         "Invalid ID",
+			id:           "invalid-id",
+			expectedCode: http.StatusBadRequest,
 		},
 	}
 
@@ -65,7 +78,7 @@ func Test_redirectURL(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			redirectURL(w, req)
+			service.RedirectURL(w, req, tt.id)
 
 			assert.Equal(t, tt.expectedCode, w.Code)
 
@@ -77,13 +90,7 @@ func Test_redirectURL(t *testing.T) {
 }
 
 func Test_shortenURL(t *testing.T) {
-	testStorage := setupTestStorage(t)
-	urlStore = testStorage
-
-	Cfg = &configs.Config{
-		ServerAddress: "localhost:8080",
-		BaseURL:       "http://localhost:8080/",
-	}
+	service, _ := setupTestService(t)
 
 	tests := []struct {
 		name                   string
@@ -115,7 +122,7 @@ func Test_shortenURL(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(tt.body))
 			w := httptest.NewRecorder()
 
-			shortenURL(w, req)
+			service.ShortenURL(w, req)
 
 			assert.Equal(t, tt.expectedCode, w.Code)
 
@@ -128,13 +135,7 @@ func Test_shortenURL(t *testing.T) {
 }
 
 func Test_shortenURLJSON(t *testing.T) {
-	testStorage := setupTestStorage(t)
-	urlStore = testStorage
-
-	Cfg = &configs.Config{
-		ServerAddress: "localhost:8080",
-		BaseURL:       "http://localhost:8080/",
-	}
+	service, _ := setupTestService(t)
 
 	tests := []struct {
 		name                 string
@@ -163,12 +164,14 @@ func Test_shortenURLJSON(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
-			ShortenURLJSON(w, req)
+			service.ShortenURLJSON(w, req)
 
 			assert.Equal(t, tt.expectedCode, w.Code)
 
 			if tt.expectedCode == http.StatusCreated {
-				var response ShortenResponse
+				var response struct {
+					Result string `json:"result"`
+				}
 				err := json.Unmarshal(w.Body.Bytes(), &response)
 				assert.NoError(t, err)
 				assert.Contains(t, response.Result, tt.expectResultContains)
