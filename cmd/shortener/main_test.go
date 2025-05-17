@@ -5,17 +5,41 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 )
 
+func setupTestStorage(t *testing.T) *storage.Storage {
+	tmpFile, err := os.CreateTemp("", "test_storage_*.json")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	s, err := storage.NewStorage(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to create storage: %v", err)
+	}
+
+	t.Cleanup(func() {
+		os.Remove(tmpFile.Name())
+	})
+
+	return s
+}
+
 func Test_redirectURL(t *testing.T) {
-	urlStore = make(map[string]string)
+	testStorage := setupTestStorage(t)
+	urlStore = testStorage
 	id := generateID()
-	urlStore[id] = "https://google.com"
+	if err := urlStore.Save(id, "https://google.com"); err != nil {
+		t.Fatalf("Failed to save test URL: %v", err)
+	}
 
 	tests := []struct {
 		name             string
@@ -53,6 +77,9 @@ func Test_redirectURL(t *testing.T) {
 }
 
 func Test_shortenURL(t *testing.T) {
+	testStorage := setupTestStorage(t)
+	urlStore = testStorage
+
 	Cfg = &configs.Config{
 		ServerAddress: "localhost:8080",
 		BaseURL:       "http://localhost:8080/",
@@ -101,6 +128,9 @@ func Test_shortenURL(t *testing.T) {
 }
 
 func Test_shortenURLJSON(t *testing.T) {
+	testStorage := setupTestStorage(t)
+	urlStore = testStorage
+
 	Cfg = &configs.Config{
 		ServerAddress: "localhost:8080",
 		BaseURL:       "http://localhost:8080/",

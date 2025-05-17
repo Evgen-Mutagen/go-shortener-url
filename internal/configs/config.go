@@ -8,8 +8,9 @@ import (
 )
 
 type Config struct {
-	ServerAddress string `env:"SERVER_ADDRESS" envDefault:"localhost:8080"`
-	BaseURL       string `env:"BASE_URL" envDefault:"http://localhost:8080/"`
+	ServerAddress   string `env:"SERVER_ADDRESS" envDefault:"localhost:8080"`
+	BaseURL         string `env:"BASE_URL" envDefault:"http://localhost:8080/"`
+	FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"./url_storage.json"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -21,6 +22,7 @@ func LoadConfig() (*Config, error) {
 
 	addressFlag := flag.String("a", "", "HTTP server address (host:port)")
 	baseURLFlag := flag.String("b", "", "Base URL for shortened links")
+	fileStorageFlag := flag.String("f", "", "Path to file storage")
 
 	flag.Parse()
 
@@ -29,6 +31,10 @@ func LoadConfig() (*Config, error) {
 	}
 	if *baseURLFlag != "" && cfg.BaseURL == "http://localhost:8080/" {
 		cfg.BaseURL = *baseURLFlag
+	}
+
+	if *fileStorageFlag != "" {
+		cfg.FileStoragePath = *fileStorageFlag
 	}
 
 	serverAddr := strings.TrimPrefix(cfg.ServerAddress, "http://")
@@ -42,7 +48,8 @@ func LoadConfig() (*Config, error) {
 	}
 
 	return &Config{
-		ServerAddress: serverAddr,
-		BaseURL:       baseURL,
+		ServerAddress:   serverAddr,
+		BaseURL:         baseURL,
+		FileStoragePath: cfg.FileStoragePath,
 	}, nil
 }

@@ -6,16 +6,21 @@ import (
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/compress"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/logger"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 )
 
-var urlStore = make(map[string]string)
-var idCounter = 0
-var Cfg *configs.Config
+var (
+	urlStore  *storage.Storage
+	Cfg       *configs.Config
+	idCounter int
+	idMutex   sync.Mutex
+)
 
 type ShortenRequest struct {
 	URL string `json:"url"`
@@ -32,6 +37,11 @@ func main() {
 		panic(err)
 	}
 
+	urlStore, err = storage.NewStorage(Cfg.FileStoragePath)
+	if err != nil {
+		panic(fmt.Errorf("не удалось инициализировать хранилище: %v", err))
+	}
+
 	loggerInstance, _ := zap.NewProduction()
 	defer loggerInstance.Sync()
 
@@ -45,6 +55,7 @@ func main() {
 	r.Get("/{id}", redirectURL)
 
 	fmt.Printf("Starting server on %s...\n", Cfg.ServerAddress)
+	fmt.Printf("Using storage file: %s\n", Cfg.FileStoragePath)
 
 	go func() {
 		err := http.ListenAndServe(Cfg.ServerAddress, r)
@@ -90,7 +101,11 @@ func shortenURL(w http.ResponseWriter, r *http.Request) {
 	url := string(body)
 
 	id := generateID()
-	urlStore[id] = url
+
+	if err := urlStore.Save(id, url); err != nil {
+		http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
+		return
+	}
 
 	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Content-Type", "text/plain")
@@ -100,7 +115,7 @@ func shortenURL(w http.ResponseWriter, r *http.Request) {
 func redirectURL(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	url, exists := urlStore[id]
+	url, exists := urlStore.Get(id)
 	if !exists {
 		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
 		return
@@ -120,7 +135,10 @@ func ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	id := generateID()
-	urlStore[id] = req.URL
+	if err := urlStore.Save(id, req.URL); err != nil {
+		http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
+		return
+	}
 
 	response := ShortenResponse{
 		Result: fmt.Sprintf("%s/%s", strings.TrimSuffix(Cfg.BaseURL, "/"), id),
@@ -135,6 +153,8 @@ func ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 func generateID() string {
+	idMutex.Lock()
+	defer idMutex.Unlock()
 	idCounter++
 	return fmt.Sprintf("%X", idCounter)
 }
