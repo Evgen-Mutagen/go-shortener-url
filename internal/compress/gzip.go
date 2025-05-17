@@ -1,7 +1,6 @@
 package compress
 
 import (
-	"bytes"
 	"compress/gzip"
 	"net/http"
 	"strings"
@@ -54,8 +53,7 @@ func GzipCompress(next http.Handler) http.Handler {
 
 type gzipResponseWriter struct {
 	http.ResponseWriter
-	gz  *gzip.Writer
-	buf *bytes.Buffer
+	gz *gzip.Writer
 }
 
 func (w *gzipResponseWriter) Write(b []byte) (int, error) {
@@ -66,10 +64,10 @@ func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 }
 
 func (w *gzipResponseWriter) WriteHeader(status int) {
-	if w.gz == nil && strings.Contains(w.Header().Get("Content-Encoding"), "gzip") {
-		w.buf = &bytes.Buffer{}
+	if w.gz == nil && strings.Contains(w.Header().Get("Accept-Encoding"), "gzip") {
+		w.Header().Del("Content-Length")
 		w.gz = gzipPool.Get().(*gzip.Writer)
-		w.gz.Reset(w.buf)
+		w.gz.Reset(w.ResponseWriter)
 	}
 	w.ResponseWriter.WriteHeader(status)
 }
@@ -78,8 +76,5 @@ func (w *gzipResponseWriter) Close() {
 	if w.gz != nil {
 		w.gz.Close()
 		gzipPool.Put(w.gz)
-		if w.buf != nil {
-			w.ResponseWriter.Write(w.buf.Bytes())
-		}
 	}
 }
