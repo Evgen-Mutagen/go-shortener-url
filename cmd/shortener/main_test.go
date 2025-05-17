@@ -53,7 +53,7 @@ func Test_redirectURL(t *testing.T) {
 }
 
 func Test_shortenURL(t *testing.T) {
-	cfg = &configs.Config{
+	Cfg = &configs.Config{
 		ServerAddress: "localhost:8080",
 		BaseURL:       "http://localhost:8080/",
 	}
@@ -101,7 +101,7 @@ func Test_shortenURL(t *testing.T) {
 }
 
 func Test_shortenURLJSON(t *testing.T) {
-	cfg = &configs.Config{
+	Cfg = &configs.Config{
 		ServerAddress: "localhost:8080",
 		BaseURL:       "http://localhost:8080/",
 	}
@@ -133,7 +133,7 @@ func Test_shortenURLJSON(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
-			shortenURLJSON(w, req)
+			ShortenURLJSON(w, req)
 
 			assert.Equal(t, tt.expectedCode, w.Code)
 
