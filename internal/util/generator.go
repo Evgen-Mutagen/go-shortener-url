@@ -1,13 +1,10 @@
 package util
 
 import (
-	"fmt"
-	"sync"
+	"github.com/google/uuid"
 )
 
 type IDGenerator struct {
-	counter int
-	mutex   sync.Mutex
 }
 
 func NewIDGenerator() *IDGenerator {
@@ -15,8 +12,5 @@ func NewIDGenerator() *IDGenerator {
 }
 
 func (g *IDGenerator) Generate() string {
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-	g.counter++
-	return fmt.Sprintf("%X", g.counter)
+	return uuid.New().String()
 }
