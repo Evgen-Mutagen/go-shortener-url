@@ -9,6 +9,7 @@ import (
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/urlservice"
 	"github.com/go-chi/chi/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
 	"net/http"
 	"os"
