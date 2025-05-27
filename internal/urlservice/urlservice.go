@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/repository/postgres"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/util"
 	"io"
@@ -15,14 +16,40 @@ type URLService struct {
 	cfg       *configs.Config
 	storage   *storage.Storage
 	generator *util.IDGenerator
+	Repo      *postgres.PostgresRepository
 }
 
-func New(cfg *configs.Config, storage *storage.Storage) *URLService {
+func New(cfg *configs.Config, storage *storage.Storage) (*URLService, error) {
+	var repo *postgres.PostgresRepository
+	var err error
+
+	if cfg.DatabaseDSN != "" {
+		repo, err = postgres.New(cfg.DatabaseDSN)
+		if err != nil {
+			return nil, fmt.Errorf("failed to init database: %w", err)
+		}
+	}
+
 	return &URLService{
 		cfg:       cfg,
 		storage:   storage,
+		Repo:      repo,
 		generator: util.NewIDGenerator(),
+	}, nil
+}
+
+func (s *URLService) Ping(w http.ResponseWriter, r *http.Request) {
+	if s.Repo == nil {
+		http.Error(w, "Database not configured", http.StatusInternalServerError)
+		return
 	}
+
+	if err := s.Repo.Ping(r.Context()); err != nil {
+		http.Error(w, "Database ping failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {

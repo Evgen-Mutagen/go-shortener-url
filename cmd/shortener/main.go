@@ -35,7 +35,10 @@ func main() {
 		panic(fmt.Errorf("не удалось инициализировать хранилище: %v", err))
 	}
 
-	urlService = urlservice.New(cfg, urlStore)
+	urlService, err := urlservice.New(cfg, urlStore)
+	if err != nil {
+		panic(fmt.Errorf("failed to create URL service: %v", err))
+	}
 
 	loggerInstance, _ := zap.NewProduction()
 	defer loggerInstance.Sync()
@@ -50,9 +53,13 @@ func main() {
 	r.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
 		urlService.RedirectURL(w, r, chi.URLParam(r, "id"))
 	})
+	r.Get("/ping", urlService.Ping) // Добавляем новый эндпоинт
 
 	fmt.Printf("Starting server on %s...\n", cfg.ServerAddress)
 	fmt.Printf("Using storage file: %s\n", cfg.FileStoragePath)
+	if cfg.DatabaseDSN != "" {
+		fmt.Println("Database connection enabled")
+	}
 
 	server := &http.Server{
 		Addr:    cfg.ServerAddress,
@@ -74,6 +81,12 @@ func main() {
 
 	if err := server.Shutdown(ctx); err != nil {
 		loggerInstance.Error("Server shutdown error", zap.Error(err))
+	}
+
+	if urlService.Repo != nil {
+		if err := urlService.Repo.Close(); err != nil {
+			loggerInstance.Error("Failed to close database connection", zap.Error(err))
+		}
 	}
 
 	loggerInstance.Info("Server stopped")
