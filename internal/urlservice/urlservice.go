@@ -21,6 +21,16 @@ type URLService struct {
 	Repo      *postgres.PostgresRepository
 }
 
+type BatchRequestItem struct {
+	CorrelationID string `json:"correlation_id"`
+	OriginalURL   string `json:"original_url"`
+}
+
+type BatchResponseItem struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
+}
+
 func New(cfg *configs.Config, storage *storage.Storage) (*URLService, error) {
 	var repo *postgres.PostgresRepository
 	var err error
@@ -139,6 +149,76 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Ошибка при формировании ответа", http.StatusInternalServerError)
+	}
+}
+
+func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
+	var batch []BatchRequestItem
+	if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
+		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	if len(batch) == 0 {
+		http.Error(w, "Пустой batch", http.StatusBadRequest)
+		return
+	}
+
+	items := make(map[string]string)
+	response := make([]BatchResponseItem, 0, len(batch))
+
+	for _, item := range batch {
+		if item.OriginalURL == "" {
+			http.Error(w, "URL не может быть пустым", http.StatusBadRequest)
+			return
+		}
+		id := s.generator.Generate()
+		items[id] = item.OriginalURL
+		response = append(response, BatchResponseItem{
+			CorrelationID: item.CorrelationID,
+			ShortURL:      fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), id),
+		})
+	}
+
+	if s.Repo != nil {
+		ctx := r.Context()
+		tx, err := s.Repo.BeginTx(ctx)
+		if err != nil {
+			http.Error(w, "Ошибка начала транзакции", http.StatusInternalServerError)
+			return
+		}
+
+		var txErr error
+		defer func() {
+			if txErr != nil {
+				tx.Rollback()
+			}
+		}()
+
+		for id, url := range items {
+			if err := tx.SaveURL(ctx, id, url); err != nil {
+				txErr = err
+				http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			http.Error(w, "Ошибка коммита транзакции", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		if err := s.storage.SaveBatch(items); err != nil {
+			http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Ошибка при формировании ответа", http.StatusInternalServerError)
 	}

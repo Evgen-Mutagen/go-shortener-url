@@ -195,3 +195,69 @@ func Test_pingHandler(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
+
+func Test_shortenURLBatch(t *testing.T) {
+	service, _ := setupTestService(t)
+
+	tests := []struct {
+		name                 string
+		body                 string
+		expectedCode         int
+		expectedContentType  string
+		expectItemsCount     int
+		expectResultContains string
+	}{
+		{
+			name: "Valid batch",
+			body: `[
+                {"correlation_id": "1", "original_url": "https://google.com"},
+                {"correlation_id": "2", "original_url": "https://yandex.ru"}
+            ]`,
+			expectedCode:         http.StatusCreated,
+			expectedContentType:  "application/json",
+			expectItemsCount:     2,
+			expectResultContains: "http://localhost:8080/",
+		},
+		{
+			name:         "Empty batch",
+			body:         `[]`,
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "Invalid JSON",
+			body:         `invalid`,
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			name:         "Empty URL",
+			body:         `[{"correlation_id": "1", "original_url": ""}]`,
+			expectedCode: http.StatusBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewBufferString(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			service.ShortenURLBatch(w, req)
+
+			assert.Equal(t, tt.expectedCode, w.Code)
+
+			if tt.expectedCode == http.StatusCreated {
+				var response []struct {
+					CorrelationID string `json:"correlation_id"`
+					ShortURL      string `json:"short_url"`
+				}
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectItemsCount, len(response))
+				for _, item := range response {
+					assert.Contains(t, item.ShortURL, tt.expectResultContains)
+				}
+				assert.Equal(t, tt.expectedContentType, w.Header().Get("Content-Type"))
+			}
+		})
+	}
+}

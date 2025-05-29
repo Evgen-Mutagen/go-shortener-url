@@ -63,3 +63,35 @@ func (r *PostgresRepository) GetURL(ctx context.Context, id string) (string, err
 	}
 	return originalURL, err
 }
+
+type Tx interface {
+	SaveURL(ctx context.Context, id, originalURL string) error
+	Commit() error
+	Rollback() error
+}
+
+type pgTx struct {
+	tx *sql.Tx
+}
+
+func (t *pgTx) SaveURL(ctx context.Context, id, originalURL string) error {
+	query := `INSERT INTO urls (id, original_url) VALUES ($1, $2)`
+	_, err := t.tx.ExecContext(ctx, query, id, originalURL)
+	return err
+}
+
+func (t *pgTx) Commit() error {
+	return t.tx.Commit()
+}
+
+func (t *pgTx) Rollback() error {
+	return t.tx.Rollback()
+}
+
+func (r *PostgresRepository) BeginTx(ctx context.Context) (Tx, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &pgTx{tx: tx}, nil
+}

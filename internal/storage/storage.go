@@ -91,3 +91,13 @@ func (s *Storage) load() error {
 
 	return nil
 }
+
+func (s *Storage) SaveBatch(urls map[string]string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for shortURL, originalURL := range urls {
+		s.urls[shortURL] = originalURL
+	}
+	return s.save()
+}

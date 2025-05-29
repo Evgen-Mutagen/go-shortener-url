@@ -54,7 +54,8 @@ func main() {
 	r.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
 		urlService.RedirectURL(w, r, chi.URLParam(r, "id"))
 	})
-	r.Get("/ping", urlService.Ping) // Добавляем новый эндпоинт
+	r.Get("/ping", urlService.Ping)
+	r.Post("/api/shorten/batch", urlService.ShortenURLBatch)
 
 	fmt.Printf("Starting server on %s...\n", cfg.ServerAddress)
 	fmt.Printf("Using storage file: %s\n", cfg.FileStoragePath)
