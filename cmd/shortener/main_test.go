@@ -23,16 +23,20 @@ func setupTestService(t *testing.T) (*urlservice.URLService, *storage.Storage) {
 	tmpFile.Close()
 
 	cfg := &configs.Config{
-		ServerAddress: "localhost:8080",
-		BaseURL:       "http://localhost:8080/",
+		ServerAddress:   "localhost:8080",
+		BaseURL:         "http://localhost:8080/",
+		FileStoragePath: tmpFile.Name(),
 	}
 
-	storage, err := storage.NewStorage(tmpFile.Name())
+	storage, err := storage.NewStorage(cfg.FileStoragePath)
 	if err != nil {
 		t.Fatalf("Failed to create storage: %v", err)
 	}
 
-	service := urlservice.New(cfg, storage)
+	service, err := urlservice.New(cfg, storage)
+	if err != nil {
+		t.Fatalf("Failed to create service: %v", err)
+	}
 
 	t.Cleanup(func() {
 		os.Remove(tmpFile.Name())
@@ -179,4 +183,15 @@ func Test_shortenURLJSON(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_pingHandler(t *testing.T) {
+	service, _ := setupTestService(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	w := httptest.NewRecorder()
+
+	service.Ping(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
