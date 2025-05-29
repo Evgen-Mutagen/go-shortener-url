@@ -35,3 +35,31 @@ func (r *PostgresRepository) Close() error {
 func (r *PostgresRepository) Ping(ctx context.Context) error {
 	return r.db.PingContext(ctx)
 }
+
+func (r *PostgresRepository) InitTable(ctx context.Context) error {
+	query := `
+    CREATE TABLE IF NOT EXISTS urls (
+        id VARCHAR(36) PRIMARY KEY,
+        original_url TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+    )`
+
+	_, err := r.db.ExecContext(ctx, query)
+	return err
+}
+
+func (r *PostgresRepository) SaveURL(ctx context.Context, id, originalURL string) error {
+	query := `INSERT INTO urls (id, original_url) VALUES ($1, $2)`
+	_, err := r.db.ExecContext(ctx, query, id, originalURL)
+	return err
+}
+
+func (r *PostgresRepository) GetURL(ctx context.Context, id string) (string, error) {
+	var originalURL string
+	query := `SELECT original_url FROM urls WHERE id = $1`
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&originalURL)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return originalURL, err
+}

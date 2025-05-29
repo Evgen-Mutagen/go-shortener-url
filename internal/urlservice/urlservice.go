@@ -1,6 +1,7 @@
 package urlservice
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
@@ -10,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type URLService struct {
@@ -27,6 +29,12 @@ func New(cfg *configs.Config, storage *storage.Storage) (*URLService, error) {
 		repo, err = postgres.New(cfg.DatabaseDSN)
 		if err != nil {
 			return nil, fmt.Errorf("failed to init database: %w", err)
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := repo.InitTable(ctx); err != nil {
+			return nil, fmt.Errorf("failed to init database table: %w", err)
 		}
 	}
 
@@ -58,15 +66,21 @@ func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
 		return
 	}
-
 	defer r.Body.Close()
 
 	url := string(body)
 	id := s.generator.Generate()
 
-	if err := s.storage.Save(id, url); err != nil {
-		http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
-		return
+	if s.Repo != nil {
+		if err := s.Repo.SaveURL(r.Context(), id, url); err != nil {
+			http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		if err := s.storage.Save(id, url); err != nil {
+			http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -75,7 +89,20 @@ func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *URLService) RedirectURL(w http.ResponseWriter, r *http.Request, id string) {
-	url, exists := s.storage.Get(id)
+	var url string
+	var exists bool
+
+	if s.Repo != nil {
+		originalURL, err := s.Repo.GetURL(r.Context(), id)
+		if err != nil {
+			http.Error(w, "Ошибка получения URL", http.StatusInternalServerError)
+			return
+		}
+		url, exists = originalURL, originalURL != ""
+	} else {
+		url, exists = s.storage.Get(id)
+	}
+
 	if !exists {
 		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
 		return
