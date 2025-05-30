@@ -79,14 +79,41 @@ func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	url := string(body)
-	id := s.generator.Generate()
+	var id string
 
 	if s.Repo != nil {
+		// Проверяем существование URL
+		existingID, err := s.Repo.FindExistingURL(r.Context(), url)
+		if err != nil {
+			http.Error(w, "Ошибка проверки URL", http.StatusInternalServerError)
+			return
+		}
+
+		if existingID != "" {
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte(fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), existingID)))
+			return
+		}
+
+		id = s.generator.Generate()
 		if err := s.Repo.SaveURL(r.Context(), id, url); err != nil {
+			if err == storage.ErrURLConflict {
+				existingID, err := s.Repo.FindExistingURL(r.Context(), url)
+				if err != nil {
+					http.Error(w, "Ошибка проверки URL", http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Type", "text/plain")
+				w.WriteHeader(http.StatusConflict)
+				w.Write([]byte(fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), existingID)))
+				return
+			}
 			http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
 			return
 		}
 	} else {
+		id = s.generator.Generate()
 		if err := s.storage.Save(id, url); err != nil {
 			http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
 			return
@@ -131,13 +158,57 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
 		return
 	}
-
 	defer r.Body.Close()
 
-	id := s.generator.Generate()
-	if err := s.storage.Save(id, req.URL); err != nil {
-		http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
-		return
+	var id string
+
+	if s.Repo != nil {
+		// Проверяем существование URL
+		existingID, err := s.Repo.FindExistingURL(r.Context(), req.URL)
+		if err != nil {
+			http.Error(w, "Ошибка проверки URL", http.StatusInternalServerError)
+			return
+		}
+
+		if existingID != "" {
+			response := struct {
+				Result string `json:"result"`
+			}{
+				Result: fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), existingID),
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		id = s.generator.Generate()
+		if err := s.Repo.SaveURL(r.Context(), id, req.URL); err != nil {
+			if err == storage.ErrURLConflict {
+				existingID, err := s.Repo.FindExistingURL(r.Context(), req.URL)
+				if err != nil {
+					http.Error(w, "Ошибка проверки URL", http.StatusInternalServerError)
+					return
+				}
+				response := struct {
+					Result string `json:"result"`
+				}{
+					Result: fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), existingID),
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusConflict)
+				json.NewEncoder(w).Encode(response)
+				return
+			}
+			http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		id = s.generator.Generate()
+		if err := s.storage.Save(id, req.URL); err != nil {
+			http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	response := struct {
@@ -148,7 +219,6 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Ошибка при формировании ответа", http.StatusInternalServerError)
 	}

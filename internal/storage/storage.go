@@ -2,6 +2,7 @@ package storage
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"sync"
 )
@@ -17,6 +18,10 @@ type Storage struct {
 	urls     map[string]string
 	mu       sync.RWMutex
 }
+
+var (
+	ErrURLConflict = fmt.Errorf("URL already exists")
+)
 
 func NewStorage(filePath string) (*Storage, error) {
 	s := &Storage{

@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 	"time"
 )
 
@@ -40,9 +43,10 @@ func (r *PostgresRepository) InitTable(ctx context.Context) error {
 	query := `
     CREATE TABLE IF NOT EXISTS urls (
         id VARCHAR(36) PRIMARY KEY,
-        original_url TEXT NOT NULL,
+        original_url TEXT NOT NULL UNIQUE,
         created_at TIMESTAMP DEFAULT NOW()
-    )`
+    );
+    CREATE INDEX IF NOT EXISTS idx_original_url ON urls(original_url);`
 
 	_, err := r.db.ExecContext(ctx, query)
 	return err
@@ -51,7 +55,14 @@ func (r *PostgresRepository) InitTable(ctx context.Context) error {
 func (r *PostgresRepository) SaveURL(ctx context.Context, id, originalURL string) error {
 	query := `INSERT INTO urls (id, original_url) VALUES ($1, $2)`
 	_, err := r.db.ExecContext(ctx, query, id, originalURL)
-	return err
+
+	if err != nil {
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == pgerrcode.UniqueViolation {
+			return storage.ErrURLConflict
+		}
+		return err
+	}
+	return nil
 }
 
 func (r *PostgresRepository) GetURL(ctx context.Context, id string) (string, error) {
@@ -94,4 +105,14 @@ func (r *PostgresRepository) BeginTx(ctx context.Context) (Tx, error) {
 		return nil, err
 	}
 	return &pgTx{tx: tx}, nil
+}
+
+func (r *PostgresRepository) FindExistingURL(ctx context.Context, originalURL string) (string, error) {
+	var id string
+	query := `SELECT id FROM urls WHERE original_url = $1`
+	err := r.db.QueryRowContext(ctx, query, originalURL).Scan(&id)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return id, err
 }
