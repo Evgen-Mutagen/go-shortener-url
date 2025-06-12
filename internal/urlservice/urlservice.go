@@ -237,6 +237,12 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	var batch []BatchRequestItem
 	if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
 		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
@@ -281,7 +287,7 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 		}()
 
 		for id, url := range items {
-			if err := tx.SaveURL(ctx, id, url); err != nil {
+			if err := tx.SaveURL(ctx, id, url, userID); err != nil {
 				txErr = err
 				http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
 				return

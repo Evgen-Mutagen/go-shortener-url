@@ -78,7 +78,7 @@ func (r *PostgresRepository) GetURL(ctx context.Context, id string) (string, err
 }
 
 type Tx interface {
-	SaveURL(ctx context.Context, id, originalURL string) error
+	SaveURL(ctx context.Context, id, originalURL, userID string) error
 	Commit() error
 	Rollback() error
 }
@@ -87,7 +87,7 @@ type pgTx struct {
 	tx *sql.Tx
 }
 
-func (t *pgTx) SaveURL(ctx context.Context, id, originalURL string) error {
+func (t *pgTx) SaveURL(ctx context.Context, id, originalURL, userID string) error {
 	query := `INSERT INTO urls (id, original_url) VALUES ($1, $2)`
 	_, err := t.tx.ExecContext(ctx, query, id, originalURL)
 	return err

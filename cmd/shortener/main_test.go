@@ -243,7 +243,7 @@ func Test_shortenURLBatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewBufferString(tt.body))
+			req := createRequestWithUserID(http.MethodPost, "/api/shorten/batch", bytes.NewBufferString(tt.body))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
