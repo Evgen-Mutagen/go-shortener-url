@@ -9,6 +9,7 @@ import (
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/urlservice"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -45,6 +46,11 @@ func setupTestService(t *testing.T) (*urlservice.URLService, *storage.Storage) {
 	return service, storage
 }
 
+func createRequestWithUserID(method, url string, body io.Reader) *http.Request {
+	req := httptest.NewRequest(method, url, body)
+	ctx := context.WithValue(req.Context(), "userID", "test-user-id")
+	return req.WithContext(ctx)
+}
 func Test_redirectURL(t *testing.T) {
 	service, storage := setupTestService(t)
 
@@ -123,7 +129,7 @@ func Test_shortenURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(tt.body))
+			req := createRequestWithUserID(http.MethodPost, "/", bytes.NewBufferString(tt.body))
 			w := httptest.NewRecorder()
 
 			service.ShortenURL(w, req)
@@ -164,7 +170,7 @@ func Test_shortenURLJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewBufferString(tt.body))
+			req := createRequestWithUserID(http.MethodPost, "/api/shorten", bytes.NewBufferString(tt.body))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
@@ -188,7 +194,7 @@ func Test_shortenURLJSON(t *testing.T) {
 func Test_pingHandler(t *testing.T) {
 	service, _ := setupTestService(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req := createRequestWithUserID(http.MethodGet, "/ping", nil)
 	w := httptest.NewRecorder()
 
 	service.Ping(w, req)
@@ -237,7 +243,7 @@ func Test_shortenURLBatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewBufferString(tt.body))
+			req := createRequestWithUserID(http.MethodPost, "/api/shorten/batch", bytes.NewBufferString(tt.body))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
