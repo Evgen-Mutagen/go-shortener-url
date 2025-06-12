@@ -43,18 +43,20 @@ func (r *PostgresRepository) InitTable(ctx context.Context) error {
 	query := `
     CREATE TABLE IF NOT EXISTS urls (
         id VARCHAR(36) PRIMARY KEY,
-        original_url TEXT NOT NULL UNIQUE,
+        original_url TEXT NOT NULL,
+        user_id VARCHAR(36) NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
     );
-    CREATE INDEX IF NOT EXISTS idx_original_url ON urls(original_url);`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_original_url ON urls(original_url);
+    CREATE INDEX IF NOT EXISTS idx_user_id ON urls(user_id);`
 
 	_, err := r.db.ExecContext(ctx, query)
 	return err
 }
 
-func (r *PostgresRepository) SaveURL(ctx context.Context, id, originalURL string) error {
-	query := `INSERT INTO urls (id, original_url) VALUES ($1, $2)`
-	_, err := r.db.ExecContext(ctx, query, id, originalURL)
+func (r *PostgresRepository) SaveURL(ctx context.Context, id, originalURL, userID string) error {
+	query := `INSERT INTO urls (id, original_url, user_id) VALUES ($1, $2, $3)`
+	_, err := r.db.ExecContext(ctx, query, id, originalURL, userID)
 
 	if err != nil {
 		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == pgerrcode.UniqueViolation {
@@ -115,4 +117,24 @@ func (r *PostgresRepository) FindExistingURL(ctx context.Context, originalURL st
 		return "", nil
 	}
 	return id, err
+}
+
+func (r *PostgresRepository) GetUserURLs(ctx context.Context, userID string) (map[string]string, error) {
+	query := `SELECT id, original_url FROM urls WHERE user_id = $1`
+	rows, err := r.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[string]string)
+	for rows.Next() {
+		var id, originalURL string
+		if err := rows.Scan(&id, &originalURL); err != nil {
+			return nil, err
+		}
+		result[id] = originalURL
+	}
+
+	return result, nil
 }

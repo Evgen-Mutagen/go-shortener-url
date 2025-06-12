@@ -71,6 +71,12 @@ func (s *URLService) Ping(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil || len(body) == 0 {
 		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
@@ -97,7 +103,7 @@ func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		}
 
 		id = s.generator.Generate()
-		if err := s.Repo.SaveURL(r.Context(), id, url); err != nil {
+		if err := s.Repo.SaveURL(r.Context(), id, url, userID); err != nil {
 			if err == storage.ErrURLConflict {
 				existingID, err := s.Repo.FindExistingURL(r.Context(), url)
 				if err != nil {
@@ -150,6 +156,12 @@ func (s *URLService) RedirectURL(w http.ResponseWriter, r *http.Request, id stri
 }
 
 func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	var req struct {
 		URL string `json:"url"`
 	}
@@ -183,7 +195,7 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 		}
 
 		id = s.generator.Generate()
-		if err := s.Repo.SaveURL(r.Context(), id, req.URL); err != nil {
+		if err := s.Repo.SaveURL(r.Context(), id, req.URL, userID); err != nil {
 			if err == storage.ErrURLConflict {
 				existingID, err := s.Repo.FindExistingURL(r.Context(), req.URL)
 				if err != nil {
@@ -290,6 +302,52 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Ошибка при формировании ответа", http.StatusInternalServerError)
+	}
+}
+
+func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok || userID == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	var urls map[string]string
+	var err error
+
+	if s.Repo != nil {
+		urls, err = s.Repo.GetUserURLs(r.Context(), userID)
+	} else {
+		urls = make(map[string]string)
+	}
+
+	if err != nil {
+		http.Error(w, "Ошибка получения URL", http.StatusInternalServerError)
+		return
+	}
+
+	if len(urls) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	type urlPair struct {
+		ShortURL    string `json:"short_url"`
+		OriginalURL string `json:"original_url"`
+	}
+
+	result := make([]urlPair, 0, len(urls))
+	for id, original := range urls {
+		result = append(result, urlPair{
+			ShortURL:    fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), id),
+			OriginalURL: original,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
 		http.Error(w, "Ошибка при формировании ответа", http.StatusInternalServerError)
 	}
 }

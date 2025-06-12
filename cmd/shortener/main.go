@@ -6,6 +6,7 @@ import (
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/compress"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/logger"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/middleware"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/urlservice"
 	"github.com/go-chi/chi/v5"
@@ -46,6 +47,7 @@ func main() {
 
 	r := chi.NewRouter()
 
+	r.Use(middleware.AuthMiddleware)
 	r.Use(compress.GzipCompress)
 	r.Use(logger.WithLogging(loggerInstance))
 
@@ -56,6 +58,7 @@ func main() {
 	})
 	r.Get("/ping", urlService.Ping)
 	r.Post("/api/shorten/batch", urlService.ShortenURLBatch)
+	r.Get("/api/user/urls", urlService.GetUserURLs)
 
 	loggerInstance.Info("Starting server",
 		zap.String("address", cfg.ServerAddress),
