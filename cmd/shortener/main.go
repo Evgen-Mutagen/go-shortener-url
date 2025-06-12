@@ -57,10 +57,14 @@ func main() {
 	r.Get("/ping", urlService.Ping)
 	r.Post("/api/shorten/batch", urlService.ShortenURLBatch)
 
-	fmt.Printf("Starting server on %s...\n", cfg.ServerAddress)
-	fmt.Printf("Using storage file: %s\n", cfg.FileStoragePath)
+	loggerInstance.Info("Starting server",
+		zap.String("address", cfg.ServerAddress),
+	)
+	loggerInstance.Info("Using storage file",
+		zap.String("file", cfg.FileStoragePath),
+	)
 	if cfg.DatabaseDSN != "" {
-		fmt.Println("Database connection enabled")
+		loggerInstance.Info("Database connection enabled")
 	}
 
 	server := &http.Server{

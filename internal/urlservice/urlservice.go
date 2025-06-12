@@ -85,7 +85,7 @@ func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		// Проверяем существование URL
 		existingID, err := s.Repo.FindExistingURL(r.Context(), url)
 		if err != nil {
-			http.Error(w, "Ошибка проверки URL", http.StatusInternalServerError)
+			http.Error(w, "Ошибка проверки URL", http.StatusNotFound)
 			return
 		}
 
