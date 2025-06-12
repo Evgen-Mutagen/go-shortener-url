@@ -239,19 +239,22 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value("userID").(string)
 	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
 		return
 	}
 
 	var batch []BatchRequestItem
 	if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
-		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		http.Error(w, `{"error":"Invalid request body"}`, http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
 
 	if len(batch) == 0 {
-		http.Error(w, "Пустой batch", http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		http.Error(w, `{"error":"Empty batch"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -260,7 +263,8 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 
 	for _, item := range batch {
 		if item.OriginalURL == "" {
-			http.Error(w, "URL не может быть пустым", http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json")
+			http.Error(w, `{"error":"URL cannot be empty"}`, http.StatusBadRequest)
 			return
 		}
 		id := s.generator.Generate()
@@ -275,7 +279,8 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		tx, err := s.Repo.BeginTx(ctx)
 		if err != nil {
-			http.Error(w, "Ошибка начала транзакции", http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json")
+			http.Error(w, `{"error":"Failed to start transaction"}`, http.StatusInternalServerError)
 			return
 		}
 
@@ -289,18 +294,36 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 		for id, url := range items {
 			if err := tx.SaveURL(ctx, id, url, userID); err != nil {
 				txErr = err
-				http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
+				w.Header().Set("Content-Type", "application/json")
+				if err == storage.ErrURLConflict {
+					existingID, err := s.Repo.FindExistingURL(ctx, url)
+					if err != nil {
+						http.Error(w, `{"error":"Failed to check existing URL"}`, http.StatusInternalServerError)
+						return
+					}
+
+					for i, respItem := range response {
+						if respItem.ShortURL == fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), id) {
+							response[i].ShortURL = fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), existingID)
+							break
+						}
+					}
+					continue
+				}
+				http.Error(w, `{"error":"Failed to save URL"}`, http.StatusInternalServerError)
 				return
 			}
 		}
 
 		if err := tx.Commit(); err != nil {
-			http.Error(w, "Ошибка коммита транзакции", http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json")
+			http.Error(w, `{"error":"Failed to commit transaction"}`, http.StatusInternalServerError)
 			return
 		}
 	} else {
 		if err := s.storage.SaveBatch(items); err != nil {
-			http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json")
+			http.Error(w, `{"error":"Failed to save URLs"}`, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -308,7 +331,8 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, "Ошибка при формировании ответа", http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		http.Error(w, `{"error":"Failed to encode response"}`, http.StatusInternalServerError)
 	}
 }
 
