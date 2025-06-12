@@ -88,13 +88,12 @@ func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	var id string
 
 	if s.Repo != nil {
-		// Проверяем существование URL
+
 		existingID, err := s.Repo.FindExistingURL(r.Context(), url)
 		if err != nil {
-			http.Error(w, "Ошибка проверки URL", http.StatusNotFound)
+			http.Error(w, "Ошибка проверки URL", http.StatusInternalServerError)
 			return
 		}
-
 		if existingID != "" {
 			w.Header().Set("Content-Type", "text/plain")
 			w.WriteHeader(http.StatusConflict)
@@ -121,13 +120,17 @@ func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	} else {
 		id = s.generator.Generate()
 		if err := s.storage.Save(id, url); err != nil {
+			if err == storage.ErrURLConflict {
+				http.Error(w, "Conflict handling not implemented for file storage", http.StatusInternalServerError)
+				return
+			}
 			http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
 			return
 		}
 	}
 
-	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), id)))
 }
 
@@ -172,16 +175,12 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	var id string
-
 	if s.Repo != nil {
-		// Проверяем существование URL
 		existingID, err := s.Repo.FindExistingURL(r.Context(), req.URL)
 		if err != nil {
 			http.Error(w, "Ошибка проверки URL", http.StatusInternalServerError)
 			return
 		}
-
 		if existingID != "" {
 			response := struct {
 				Result string `json:"result"`
@@ -193,8 +192,11 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(response)
 			return
 		}
+	}
 
-		id = s.generator.Generate()
+	id := s.generator.Generate()
+
+	if s.Repo != nil {
 		if err := s.Repo.SaveURL(r.Context(), id, req.URL, userID); err != nil {
 			if err == storage.ErrURLConflict {
 				existingID, err := s.Repo.FindExistingURL(r.Context(), req.URL)
@@ -216,8 +218,11 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		id = s.generator.Generate()
 		if err := s.storage.Save(id, req.URL); err != nil {
+			if err == storage.ErrURLConflict {
+				http.Error(w, "Conflict handling not implemented for file storage", http.StatusInternalServerError)
+				return
+			}
 			http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
 			return
 		}
