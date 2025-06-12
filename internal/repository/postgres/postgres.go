@@ -88,9 +88,15 @@ type pgTx struct {
 }
 
 func (t *pgTx) SaveURL(ctx context.Context, id, originalURL, userID string) error {
-	query := `INSERT INTO urls (id, original_url) VALUES ($1, $2)`
-	_, err := t.tx.ExecContext(ctx, query, id, originalURL)
-	return err
+	query := `INSERT INTO urls (id, original_url, user_id) VALUES ($1, $2, $3)`
+	_, err := t.tx.ExecContext(ctx, query, id, originalURL, userID)
+	if err != nil {
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == pgerrcode.UniqueViolation {
+			return storage.ErrURLConflict
+		}
+		return err
+	}
+	return nil
 }
 
 func (t *pgTx) Commit() error {

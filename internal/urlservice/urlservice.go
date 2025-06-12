@@ -239,22 +239,21 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value("userID").(string)
 	if !ok {
-		w.Header().Set("Content-Type", "application/json")
-		http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	var batch []BatchRequestItem
 	if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		http.Error(w, `{"error":"Invalid request body"}`, http.StatusBadRequest)
+		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
 
 	if len(batch) == 0 {
 		w.Header().Set("Content-Type", "application/json")
-		http.Error(w, `{"error":"Empty batch"}`, http.StatusBadRequest)
+		http.Error(w, "Empty batch", http.StatusBadRequest)
 		return
 	}
 
@@ -264,7 +263,7 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 	for _, item := range batch {
 		if item.OriginalURL == "" {
 			w.Header().Set("Content-Type", "application/json")
-			http.Error(w, `{"error":"URL cannot be empty"}`, http.StatusBadRequest)
+			http.Error(w, "URL cannot be empty", http.StatusBadRequest)
 			return
 		}
 		id := s.generator.Generate()
@@ -279,51 +278,40 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		tx, err := s.Repo.BeginTx(ctx)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			http.Error(w, `{"error":"Failed to start transaction"}`, http.StatusInternalServerError)
+			http.Error(w, "Failed to start transaction", http.StatusInternalServerError)
 			return
 		}
 
-		var txErr error
-		defer func() {
-			if txErr != nil {
-				tx.Rollback()
-			}
-		}()
-
 		for id, url := range items {
 			if err := tx.SaveURL(ctx, id, url, userID); err != nil {
-				txErr = err
-				w.Header().Set("Content-Type", "application/json")
+				tx.Rollback()
 				if err == storage.ErrURLConflict {
 					existingID, err := s.Repo.FindExistingURL(ctx, url)
 					if err != nil {
-						http.Error(w, `{"error":"Failed to check existing URL"}`, http.StatusInternalServerError)
+						http.Error(w, "Failed to check URL existence", http.StatusInternalServerError)
 						return
 					}
-
-					for i, respItem := range response {
-						if respItem.ShortURL == fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), id) {
+					// Update the response with existing URL
+					for i, item := range response {
+						if item.ShortURL == fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), id) {
 							response[i].ShortURL = fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), existingID)
 							break
 						}
 					}
 					continue
 				}
-				http.Error(w, `{"error":"Failed to save URL"}`, http.StatusInternalServerError)
+				http.Error(w, "Failed to save URL", http.StatusInternalServerError)
 				return
 			}
 		}
 
 		if err := tx.Commit(); err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			http.Error(w, `{"error":"Failed to commit transaction"}`, http.StatusInternalServerError)
+			http.Error(w, "Failed to commit transaction", http.StatusInternalServerError)
 			return
 		}
 	} else {
 		if err := s.storage.SaveBatch(items); err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			http.Error(w, `{"error":"Failed to save URLs"}`, http.StatusInternalServerError)
+			http.Error(w, "Failed to save URLs", http.StatusInternalServerError)
 			return
 		}
 	}
@@ -331,8 +319,7 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		http.Error(w, `{"error":"Failed to encode response"}`, http.StatusInternalServerError)
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
 }
 
