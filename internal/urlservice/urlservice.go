@@ -161,7 +161,7 @@ func (s *URLService) RedirectURL(w http.ResponseWriter, r *http.Request, id stri
 func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value("userID").(string)
 	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
 		return
 	}
 
@@ -169,75 +169,88 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 		URL string `json:"url"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.URL == "" {
-		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request"})
 		return
 	}
 	defer r.Body.Close()
 
-	if s.Repo != nil {
-		existingID, err := s.Repo.FindExistingURL(r.Context(), req.URL)
-		if err != nil {
-			http.Error(w, "Ошибка проверки URL", http.StatusInternalServerError)
-			return
-		}
-		if existingID != "" {
-			response := struct {
-				Result string `json:"result"`
-			}{
-				Result: fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), existingID),
-			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusConflict)
-			json.NewEncoder(w).Encode(response)
-			return
-		}
+	if req.URL == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "URL cannot be empty"})
+		return
 	}
 
-	id := s.generator.Generate()
-
+	// Check if URL exists first
+	var existingID string
+	var err error
 	if s.Repo != nil {
-		if err := s.Repo.SaveURL(r.Context(), id, req.URL, userID); err != nil {
-			if err == storage.ErrURLConflict {
-				existingID, err := s.Repo.FindExistingURL(r.Context(), req.URL)
-				if err != nil {
-					http.Error(w, "Ошибка проверки URL", http.StatusInternalServerError)
-					return
-				}
-				response := struct {
-					Result string `json:"result"`
-				}{
-					Result: fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), existingID),
-				}
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusConflict)
-				json.NewEncoder(w).Encode(response)
-				return
-			}
-			http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
-			return
-		}
-	} else {
-		if err := s.storage.Save(id, req.URL); err != nil {
-			if err == storage.ErrURLConflict {
-				http.Error(w, "Conflict handling not implemented for file storage", http.StatusInternalServerError)
-				return
-			}
-			http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
+		existingID, err = s.Repo.FindExistingURL(r.Context(), req.URL)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error checking URL"})
 			return
 		}
 	}
 
 	response := struct {
 		Result string `json:"result"`
-	}{
-		Result: fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), id),
+	}{}
+
+	if existingID != "" {
+		response.Result = fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), existingID)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(response)
+		return
 	}
 
+	id := s.generator.Generate()
+	if s.Repo != nil {
+		if err := s.Repo.SaveURL(r.Context(), id, req.URL, userID); err != nil {
+			if err == storage.ErrURLConflict {
+				existingID, err := s.Repo.FindExistingURL(r.Context(), req.URL)
+				if err != nil {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusInternalServerError)
+					json.NewEncoder(w).Encode(map[string]string{"error": "Error checking URL"})
+					return
+				}
+				response.Result = fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), existingID)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusConflict)
+				json.NewEncoder(w).Encode(response)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error saving URL"})
+			return
+		}
+	} else {
+		if err := s.storage.Save(id, req.URL); err != nil {
+			if err == storage.ErrURLConflict {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusConflict)
+				json.NewEncoder(w).Encode(map[string]string{"error": "URL already exists"})
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error saving URL"})
+			return
+		}
+	}
+
+	response.Result = fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), id)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, "Ошибка при формировании ответа", http.StatusInternalServerError)
+		http.Error(w, `{"error":"Error forming response"}`, http.StatusInternalServerError)
 	}
 }
 
