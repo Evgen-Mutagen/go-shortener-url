@@ -17,7 +17,7 @@ type URLRecord struct {
 
 type Storage struct {
 	filePath string
-	urls     map[string]string
+	urls     map[string]URLRecord
 	mu       sync.RWMutex
 }
 
@@ -28,7 +28,7 @@ var (
 func NewStorage(filePath string) (*Storage, error) {
 	s := &Storage{
 		filePath: filePath,
-		urls:     make(map[string]string),
+		urls:     make(map[string]URLRecord),
 	}
 
 	if err := s.load(); err != nil {
@@ -42,14 +42,14 @@ func (s *Storage) Save(shortURL, originalURL, userID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.urls[shortURL] = originalURL
-
 	record := URLRecord{
 		UUID:        shortURL,
 		ShortURL:    shortURL,
 		OriginalURL: originalURL,
 		UserID:      userID,
 	}
+
+	s.urls[shortURL] = record
 
 	file, err := os.OpenFile(s.filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -65,8 +65,8 @@ func (s *Storage) Get(shortURL string) (string, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if url, exists := s.urls[shortURL]; exists {
-		return url, true
+	if record, exists := s.urls[shortURL]; exists {
+		return record.OriginalURL, true
 	}
 
 	file, err := os.Open(s.filePath)
@@ -97,12 +97,7 @@ func (s *Storage) save() error {
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)
-	for shortURL, originalURL := range s.urls {
-		record := URLRecord{
-			UUID:        shortURL,
-			ShortURL:    shortURL,
-			OriginalURL: originalURL,
-		}
+	for _, record := range s.urls {
 		if err := encoder.Encode(record); err != nil {
 			return err
 		}
@@ -128,7 +123,7 @@ func (s *Storage) load() error {
 		if err := decoder.Decode(&record); err != nil {
 			return err
 		}
-		s.urls[record.ShortURL] = record.OriginalURL
+		s.urls[record.ShortURL] = record
 	}
 
 	return nil
@@ -152,6 +147,7 @@ func (s *Storage) SaveBatch(urls map[string]string, userID string) error {
 			OriginalURL: originalURL,
 			UserID:      userID,
 		}
+		s.urls[shortURL] = record
 		if err := encoder.Encode(record); err != nil {
 			return err
 		}
@@ -165,6 +161,12 @@ func (s *Storage) GetUserURLs(userID string) map[string]string {
 	defer s.mu.RUnlock()
 
 	result := make(map[string]string)
+
+	for _, record := range s.urls {
+		if record.UserID == userID {
+			result[record.ShortURL] = record.OriginalURL
+		}
+	}
 
 	file, err := os.Open(s.filePath)
 	if err == nil {
