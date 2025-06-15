@@ -23,9 +23,11 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		if err != nil || !validateCookie(cookie) {
 			userID := uuid.New().String()
 			setAuthCookie(w, userID)
+			w.Header().Set("Authorization", "Bearer "+userID)
 			ctx := context.WithValue(r.Context(), "userID", userID)
 			r = r.WithContext(ctx)
 		} else {
+			w.Header().Set("Authorization", "Bearer "+cookie.Value)
 			ctx := context.WithValue(r.Context(), "userID", cookie.Value)
 			r = r.WithContext(ctx)
 		}

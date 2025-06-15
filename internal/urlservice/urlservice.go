@@ -397,5 +397,7 @@ func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		http.Error(w, "Encoding error", http.StatusInternalServerError)
+	}
 }
