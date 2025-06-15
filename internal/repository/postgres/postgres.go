@@ -42,9 +42,9 @@ func (r *PostgresRepository) Ping(ctx context.Context) error {
 func (r *PostgresRepository) InitTable(ctx context.Context) error {
 	query := `
     CREATE TABLE IF NOT EXISTS urls (
-        id VARCHAR(36) PRIMARY KEY,
+        id VARCHAR(255) PRIMARY KEY,
         original_url TEXT NOT NULL,
-        user_id VARCHAR(36) NOT NULL,
+        user_id VARCHAR(255) NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_original_url ON urls(original_url);
@@ -59,11 +59,17 @@ func (r *PostgresRepository) SaveURL(ctx context.Context, id, originalURL, userI
 	_, err := r.db.ExecContext(ctx, query, id, originalURL, userID)
 
 	if err != nil {
-		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == pgerrcode.UniqueViolation {
-			return storage.ErrURLConflict
+		fmt.Printf("SaveURL error: %v\n", err) // Логирование ошибки
+
+		if pgErr, ok := err.(*pgconn.PgError); ok {
+			fmt.Printf("PG Error Details: Code=%s, Message=%s\n", pgErr.Code, pgErr.Message)
+			if pgErr.Code == pgerrcode.UniqueViolation {
+				return storage.ErrURLConflict
+			}
 		}
 		return err
 	}
+	fmt.Printf("Successfully saved URL: %s\n", originalURL)
 	return nil
 }
 

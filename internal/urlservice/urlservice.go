@@ -73,6 +73,8 @@ func (s *URLService) Ping(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("ShortenURL started")
+	defer fmt.Println("ShortenURL completed")
 	userID, ok := r.Context().Value("userID").(string)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)

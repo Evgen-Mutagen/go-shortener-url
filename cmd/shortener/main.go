@@ -37,7 +37,7 @@ func main() {
 		panic(fmt.Errorf("не удалось инициализировать хранилище: %v", err))
 	}
 
-	urlService, err := urlservice.New(cfg, urlStore)
+	urlService, err = urlservice.New(cfg, urlStore)
 	if err != nil {
 		panic(fmt.Errorf("failed to create URL service: %v", err))
 	}
