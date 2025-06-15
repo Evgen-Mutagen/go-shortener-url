@@ -166,18 +166,21 @@ func (s *Storage) GetUserURLs(userID string) map[string]string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	result := make(map[string]string)
+	for shortURL, originalURL := range s.urls {
+		result[shortURL] = originalURL
+	}
+
 	file, err := os.Open(s.filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return make(map[string]string)
+			return result
 		}
-		return make(map[string]string)
+		return result
 	}
 	defer file.Close()
 
-	result := make(map[string]string)
 	decoder := json.NewDecoder(file)
-
 	for {
 		var record URLRecord
 		if err := decoder.Decode(&record); err != nil {

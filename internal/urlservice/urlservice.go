@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -76,6 +77,7 @@ func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("ShortenURL started")
 	defer fmt.Println("ShortenURL completed")
 	userID, ok := r.Context().Value("userID").(string)
+	log.Printf("Shortening URL for user: %s", userID)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -356,7 +358,6 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
-
 	userID, ok := r.Context().Value("userID").(string)
 	if !ok || userID == "" {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -373,15 +374,11 @@ func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
+		// Получаем URL из памяти и файла
 		urls = s.storage.GetUserURLs(userID)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-
-	if len(urls) == 0 {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
 
 	type urlPair struct {
 		ShortURL    string `json:"short_url"`
