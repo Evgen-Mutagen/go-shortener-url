@@ -374,7 +374,6 @@ func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		// Получаем URL из памяти и файла
 		urls = s.storage.GetUserURLs(userID)
 	}
 
@@ -391,6 +390,11 @@ func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 			ShortURL:    fmt.Sprintf("%s/%s", s.cfg.BaseURL, id),
 			OriginalURL: original,
 		})
+	}
+
+	if len(result) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)

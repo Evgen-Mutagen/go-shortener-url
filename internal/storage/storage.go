@@ -42,6 +42,8 @@ func (s *Storage) Save(shortURL, originalURL, userID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	s.urls[shortURL] = originalURL
+
 	record := URLRecord{
 		UUID:        shortURL,
 		ShortURL:    shortURL,
@@ -56,11 +58,7 @@ func (s *Storage) Save(shortURL, originalURL, userID string) error {
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)
-	if err := encoder.Encode(record); err != nil {
-		return err
-	}
-
-	return nil
+	return encoder.Encode(record)
 }
 
 func (s *Storage) Get(shortURL string) (string, bool) {
@@ -167,31 +165,22 @@ func (s *Storage) GetUserURLs(userID string) map[string]string {
 	defer s.mu.RUnlock()
 
 	result := make(map[string]string)
-	for shortURL, originalURL := range s.urls {
-		result[shortURL] = originalURL
-	}
 
 	file, err := os.Open(s.filePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return result
-		}
-		return result
-	}
-	defer file.Close()
-
-	decoder := json.NewDecoder(file)
-	for {
-		var record URLRecord
-		if err := decoder.Decode(&record); err != nil {
-			if err == io.EOF {
-				break
+	if err == nil {
+		defer file.Close()
+		decoder := json.NewDecoder(file)
+		for {
+			var record URLRecord
+			if err := decoder.Decode(&record); err != nil {
+				if err == io.EOF {
+					break
+				}
+				continue
 			}
-			continue
-		}
-
-		if record.UserID == userID {
-			result[record.ShortURL] = record.OriginalURL
+			if record.UserID == userID {
+				result[record.ShortURL] = record.OriginalURL
+			}
 		}
 	}
 
