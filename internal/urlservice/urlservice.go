@@ -94,7 +94,6 @@ func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	var id string
 
 	if s.Repo != nil {
-
 		existingID, err := s.Repo.FindExistingURL(r.Context(), url)
 		if err != nil {
 			http.Error(w, "Ошибка проверки URL", http.StatusInternalServerError)
@@ -109,7 +108,7 @@ func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 
 		id = s.generator.Generate()
 		if err := s.Repo.SaveURL(r.Context(), id, url, userID); err != nil {
-			if err == storage.ErrURLConflict {
+			if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == pgerrcode.UniqueViolation {
 				existingID, err := s.Repo.FindExistingURL(r.Context(), url)
 				if err != nil {
 					http.Error(w, "Ошибка проверки URL", http.StatusInternalServerError)
@@ -123,6 +122,10 @@ func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Ошибка сохранения URL", http.StatusInternalServerError)
 			return
 		}
+
+		if err := s.storage.Save(id, url, userID); err != nil && err != storage.ErrURLConflict {
+			log.Printf("Failed to save URL to file storage: %v", err)
+		}
 	} else {
 		id = s.generator.Generate()
 		if err := s.storage.Save(id, url, userID); err != nil {
@@ -135,6 +138,7 @@ func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	log.Printf("Successfully saved URL: %s", url)
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), id)))
@@ -373,6 +377,15 @@ func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Database error", http.StatusInternalServerError)
 			return
 		}
+
+		fileUrls := s.storage.GetUserURLs(userID)
+		if urls == nil {
+			urls = fileUrls
+		} else {
+			for k, v := range fileUrls {
+				urls[k] = v
+			}
+		}
 	} else {
 		urls = s.storage.GetUserURLs(userID)
 	}
@@ -387,7 +400,7 @@ func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 	result := make([]urlPair, 0, len(urls))
 	for id, original := range urls {
 		result = append(result, urlPair{
-			ShortURL:    fmt.Sprintf("%s/%s", s.cfg.BaseURL, id),
+			ShortURL:    fmt.Sprintf("%s%s", s.cfg.BaseURL, id),
 			OriginalURL: original,
 		})
 	}
