@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/middleware"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/urlservice"
 	"github.com/go-chi/chi/v5"
@@ -48,11 +49,9 @@ func setupTestService(t *testing.T) (*urlservice.URLService, *storage.Storage) {
 
 type contextKey string
 
-const userIDKey contextKey = "userID"
-
 func createRequestWithUserID(method, url string, body io.Reader) *http.Request {
 	req := httptest.NewRequest(method, url, body)
-	ctx := context.WithValue(req.Context(), userIDKey, "test-user-id")
+	ctx := context.WithValue(req.Context(), middleware.UserIDKey, "test-user-id")
 	return req.WithContext(ctx)
 }
 
