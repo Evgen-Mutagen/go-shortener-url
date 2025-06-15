@@ -148,5 +148,9 @@ func (r *PostgresRepository) GetUserURLs(ctx context.Context, userID string) (ma
 		result[id] = originalURL
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return result, nil
 }

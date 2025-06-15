@@ -358,6 +358,8 @@ func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 	var urls map[string]string
 	var err error
 
+	w.Header().Set("Content-Type", "application/json")
+
 	if s.Repo != nil {
 		urls, err = s.Repo.GetUserURLs(r.Context(), userID)
 	} else {
@@ -387,7 +389,6 @@ func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(result); err != nil {
 		http.Error(w, "Ошибка при формировании ответа", http.StatusInternalServerError)
