@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -357,29 +356,31 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
-	// 1. Извлекаем userID из контекста
+
 	userID, ok := r.Context().Value("userID").(string)
 	if !ok || userID == "" {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	// 2. Устанавливаем заголовок Content-Type
-	w.Header().Set("Content-Type", "application/json")
-
-	// 3. Получаем URL пользователя
 	var urls map[string]string
 	var err error
 
 	if s.Repo != nil {
 		urls, err = s.Repo.GetUserURLs(r.Context(), userID)
 		if err != nil {
-			log.Printf("GetUserURLs error: %v", err)
 			http.Error(w, "Database error", http.StatusInternalServerError)
 			return
 		}
 	} else {
 		urls = s.storage.GetUserURLs(userID)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if len(urls) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
 	}
 
 	type urlPair struct {
@@ -390,19 +391,11 @@ func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 	result := make([]urlPair, 0, len(urls))
 	for id, original := range urls {
 		result = append(result, urlPair{
-			ShortURL:    fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), id),
+			ShortURL:    fmt.Sprintf("%s/%s", s.cfg.BaseURL, id),
 			OriginalURL: original,
 		})
 	}
 
-	if len(result) == 0 {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(result); err != nil {
-		log.Printf("Encoding error: %v", err)
-		http.Error(w, "Encoding error", http.StatusInternalServerError)
-	}
+	json.NewEncoder(w).Encode(result)
 }

@@ -34,17 +34,11 @@ func AuthMiddleware(next http.Handler) http.Handler {
 }
 
 func validateCookie(cookie *http.Cookie) bool {
-	if cookie == nil {
-		return false
-	}
-
 	parts := strings.Split(cookie.Value, ".")
 	if len(parts) != 2 {
 		return false
 	}
-
-	signature := generateSignature(parts[0])
-	return parts[1] == signature
+	return parts[1] == generateSignature(parts[0]) // Проверка HMAC подписи
 }
 
 func setAuthCookie(w http.ResponseWriter, userID string) {
