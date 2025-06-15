@@ -8,6 +8,8 @@ import (
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/repository/postgres"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/util"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 	"io"
 	"net/http"
 	"strings"
@@ -161,7 +163,9 @@ func (s *URLService) RedirectURL(w http.ResponseWriter, r *http.Request, id stri
 func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value("userID").(string)
 	if !ok {
-		http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized"})
 		return
 	}
 
@@ -184,6 +188,10 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	response := struct {
+		Result string `json:"result"`
+	}{}
+
 	// Check if URL exists first
 	var existingID string
 	var err error
@@ -197,10 +205,6 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	response := struct {
-		Result string `json:"result"`
-	}{}
-
 	if existingID != "" {
 		response.Result = fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), existingID)
 		w.Header().Set("Content-Type", "application/json")
@@ -212,7 +216,8 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 	id := s.generator.Generate()
 	if s.Repo != nil {
 		if err := s.Repo.SaveURL(r.Context(), id, req.URL, userID); err != nil {
-			if err == storage.ErrURLConflict {
+			if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == pgerrcode.UniqueViolation {
+				// If we get a conflict, try to find the existing URL again
 				existingID, err := s.Repo.FindExistingURL(r.Context(), req.URL)
 				if err != nil {
 					w.Header().Set("Content-Type", "application/json")
