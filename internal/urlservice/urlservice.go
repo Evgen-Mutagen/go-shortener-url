@@ -363,6 +363,7 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 
 func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value("userID").(string)
+	log.Printf("GetUserURLs called with userID: %s", userID)
 	if !ok || userID == "" {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -372,25 +373,28 @@ func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	if s.Repo != nil {
+		log.Println("Checking database for user URLs")
 		urls, err = s.Repo.GetUserURLs(r.Context(), userID)
+		log.Printf("Found %d URLs in database", len(urls))
 		if err != nil {
 			http.Error(w, "Database error", http.StatusInternalServerError)
 			return
 		}
-
-		fileUrls := s.storage.GetUserURLs(userID)
-		if urls == nil {
-			urls = fileUrls
-		} else {
-			for k, v := range fileUrls {
-				urls[k] = v
-			}
-		}
 	} else {
-		urls = s.storage.GetUserURLs(userID)
+		urls = make(map[string]string)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	log.Printf("Checking file storage for user URLs")
+	fileUrls := s.storage.GetUserURLs(userID)
+	log.Printf("Found %d URLs in file storage", len(fileUrls))
+	for k, v := range fileUrls {
+		urls[k] = v
+	}
+
+	if len(urls) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 
 	type urlPair struct {
 		ShortURL    string `json:"short_url"`
@@ -405,11 +409,7 @@ func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	if len(result) == 0 {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(result); err != nil {
 		http.Error(w, "Encoding error", http.StatusInternalServerError)

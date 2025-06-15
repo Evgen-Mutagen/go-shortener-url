@@ -132,15 +132,10 @@ func (r *PostgresRepository) FindExistingURL(ctx context.Context, originalURL st
 }
 
 func (r *PostgresRepository) GetUserURLs(ctx context.Context, userID string) (map[string]string, error) {
-	query := `
-        SELECT id, original_url 
-        FROM urls 
-        WHERE user_id = $1
-    `
-
+	query := `SELECT id, original_url FROM urls WHERE user_id = $1`
 	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
-		return nil, fmt.Errorf("query error: %w", err)
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -148,13 +143,13 @@ func (r *PostgresRepository) GetUserURLs(ctx context.Context, userID string) (ma
 	for rows.Next() {
 		var id, originalURL string
 		if err := rows.Scan(&id, &originalURL); err != nil {
-			return nil, fmt.Errorf("scan error: %w", err)
+			return nil, err
 		}
 		result[id] = originalURL
 	}
 
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows error: %w", err)
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return result, nil

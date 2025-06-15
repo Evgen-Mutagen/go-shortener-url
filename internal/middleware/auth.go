@@ -20,17 +20,19 @@ const (
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(cookieName)
+		var userID string
+
 		if err != nil || !validateCookie(cookie) {
-			userID := uuid.New().String()
+			userID = uuid.New().String()
 			setAuthCookie(w, userID)
-			w.Header().Set("Authorization", "Bearer "+userID)
-			ctx := context.WithValue(r.Context(), "userID", userID)
-			r = r.WithContext(ctx)
 		} else {
-			w.Header().Set("Authorization", "Bearer "+cookie.Value)
-			ctx := context.WithValue(r.Context(), "userID", cookie.Value)
-			r = r.WithContext(ctx)
+			userID = strings.Split(cookie.Value, ".")[0]
 		}
+
+		w.Header().Set("Authorization", "Bearer "+userID)
+		ctx := context.WithValue(r.Context(), "userID", userID)
+		r = r.WithContext(ctx)
+
 		next.ServeHTTP(w, r)
 	})
 }
