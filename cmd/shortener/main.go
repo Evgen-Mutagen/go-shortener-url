@@ -6,9 +6,11 @@ import (
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/compress"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/logger"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/middleware"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/urlservice"
 	"github.com/go-chi/chi/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
 	"net/http"
 	"os"
@@ -35,13 +37,17 @@ func main() {
 		panic(fmt.Errorf("не удалось инициализировать хранилище: %v", err))
 	}
 
-	urlService = urlservice.New(cfg, urlStore)
+	urlService, err = urlservice.New(cfg, urlStore)
+	if err != nil {
+		panic(fmt.Errorf("failed to create URL service: %v", err))
+	}
 
 	loggerInstance, _ := zap.NewProduction()
 	defer loggerInstance.Sync()
 
 	r := chi.NewRouter()
 
+	r.Use(middleware.AuthMiddleware)
 	r.Use(compress.GzipCompress)
 	r.Use(logger.WithLogging(loggerInstance))
 
@@ -50,9 +56,19 @@ func main() {
 	r.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
 		urlService.RedirectURL(w, r, chi.URLParam(r, "id"))
 	})
+	r.Get("/ping", urlService.Ping)
+	r.Post("/api/shorten/batch", urlService.ShortenURLBatch)
+	r.Get("/api/user/urls", urlService.GetUserURLs)
 
-	fmt.Printf("Starting server on %s...\n", cfg.ServerAddress)
-	fmt.Printf("Using storage file: %s\n", cfg.FileStoragePath)
+	loggerInstance.Info("Starting server",
+		zap.String("address", cfg.ServerAddress),
+	)
+	loggerInstance.Info("Using storage file",
+		zap.String("file", cfg.FileStoragePath),
+	)
+	if cfg.DatabaseDSN != "" {
+		loggerInstance.Info("Database connection enabled")
+	}
 
 	server := &http.Server{
 		Addr:    cfg.ServerAddress,
@@ -74,6 +90,12 @@ func main() {
 
 	if err := server.Shutdown(ctx); err != nil {
 		loggerInstance.Error("Server shutdown error", zap.Error(err))
+	}
+
+	if urlService.Repo != nil {
+		if err := urlService.Repo.Close(); err != nil {
+			loggerInstance.Error("Failed to close database connection", zap.Error(err))
+		}
 	}
 
 	loggerInstance.Info("Server stopped")
