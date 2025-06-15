@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -123,7 +124,7 @@ func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		id = s.generator.Generate()
-		if err := s.storage.Save(id, url); err != nil {
+		if err := s.storage.Save(id, url, userID); err != nil {
 			if err == storage.ErrURLConflict {
 				http.Error(w, "Conflict handling not implemented for file storage", http.StatusInternalServerError)
 				return
@@ -139,6 +140,11 @@ func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *URLService) RedirectURL(w http.ResponseWriter, r *http.Request, id string) {
+	if id == "" {
+		http.Error(w, "ID is required", http.StatusBadRequest)
+		return
+	}
+
 	var url string
 	var exists bool
 
@@ -239,7 +245,7 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		if err := s.storage.Save(id, req.URL); err != nil {
+		if err := s.storage.Save(id, req.URL, userID); err != nil {
 			if err == storage.ErrURLConflict {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusConflict)
@@ -262,6 +268,7 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
+	// Получаем userID из контекста
 	userID, ok := r.Context().Value("userID").(string)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -316,7 +323,7 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 						http.Error(w, "Failed to check URL existence", http.StatusInternalServerError)
 						return
 					}
-					// Update the response with existing URL
+					// Обновляем response с существующим URL
 					for i, item := range response {
 						if item.ShortURL == fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), id) {
 							response[i].ShortURL = fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), existingID)
@@ -335,7 +342,8 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		if err := s.storage.SaveBatch(items); err != nil {
+		// Передаём userID в SaveBatch
+		if err := s.storage.SaveBatch(items, userID); err != nil {
 			http.Error(w, "Failed to save URLs", http.StatusInternalServerError)
 			return
 		}
@@ -349,31 +357,29 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
+	// 1. Извлекаем userID из контекста
 	userID, ok := r.Context().Value("userID").(string)
 	if !ok || userID == "" {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
+	// 2. Устанавливаем заголовок Content-Type
+	w.Header().Set("Content-Type", "application/json")
+
+	// 3. Получаем URL пользователя
 	var urls map[string]string
 	var err error
 
-	w.Header().Set("Content-Type", "application/json")
-
 	if s.Repo != nil {
 		urls, err = s.Repo.GetUserURLs(r.Context(), userID)
+		if err != nil {
+			log.Printf("GetUserURLs error: %v", err)
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
 	} else {
-		urls = make(map[string]string)
-	}
-
-	if err != nil {
-		http.Error(w, "Ошибка получения URL", http.StatusInternalServerError)
-		return
-	}
-
-	if len(urls) == 0 {
-		w.WriteHeader(http.StatusNoContent)
-		return
+		urls = s.storage.GetUserURLs(userID)
 	}
 
 	type urlPair struct {
@@ -389,8 +395,14 @@ func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	if len(result) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(result); err != nil {
-		http.Error(w, "Ошибка при формировании ответа", http.StatusInternalServerError)
+		log.Printf("Encoding error: %v", err)
+		http.Error(w, "Encoding error", http.StatusInternalServerError)
 	}
 }

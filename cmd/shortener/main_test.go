@@ -55,8 +55,18 @@ func Test_redirectURL(t *testing.T) {
 	service, storage := setupTestService(t)
 
 	id := "testID123"
-	if err := storage.Save(id, "https://google.com"); err != nil {
+	originalURL := "https://google.com"
+	userId := "123"
+
+	// Явно сохраняем тестовый URL
+	if err := storage.Save(id, originalURL, userId); err != nil {
 		t.Fatalf("Failed to save test URL: %v", err)
+	}
+
+	// Проверяем, что URL сохранился
+	storedURL, exists := storage.Get(id)
+	if !exists || storedURL != originalURL {
+		t.Fatalf("Test URL not found in storage")
 	}
 
 	tests := []struct {
@@ -69,7 +79,7 @@ func Test_redirectURL(t *testing.T) {
 			name:             "Valid ID",
 			id:               id,
 			expectedCode:     http.StatusTemporaryRedirect,
-			expectedLocation: "https://google.com",
+			expectedLocation: originalURL,
 		},
 		{
 			name:         "Invalid ID",
@@ -82,6 +92,7 @@ func Test_redirectURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/"+tt.id, nil)
 
+			// Правильно устанавливаем параметр маршрута
 			routeContext := chi.NewRouteContext()
 			routeContext.URLParams.Add("id", tt.id)
 			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, routeContext))
@@ -90,10 +101,14 @@ func Test_redirectURL(t *testing.T) {
 
 			service.RedirectURL(w, req, tt.id)
 
-			assert.Equal(t, tt.expectedCode, w.Code)
+			if w.Code != tt.expectedCode {
+				t.Errorf("Expected status %d, got %d", tt.expectedCode, w.Code)
+			}
 
-			if tt.expectedCode == http.StatusTemporaryRedirect {
-				assert.Equal(t, tt.expectedLocation, w.Header().Get("Location"))
+			if tt.expectedLocation != "" {
+				if location := w.Header().Get("Location"); location != tt.expectedLocation {
+					t.Errorf("Expected location %q, got %q", tt.expectedLocation, location)
+				}
 			}
 		})
 	}
