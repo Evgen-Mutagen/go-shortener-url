@@ -11,10 +11,13 @@ import (
 	"time"
 )
 
+type contextKey string
+
 const (
-	cookieName    = "user_id"
-	secretKey     = "your-secret-key"
-	cookieExpires = 24 * time.Hour * 30
+	UserIDKey     contextKey = "userID"
+	cookieName               = "user_id"
+	secretKey                = "your-secret-key"
+	cookieExpires            = 24 * time.Hour * 30
 )
 
 func AuthMiddleware(next http.Handler) http.Handler {
@@ -30,7 +33,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		w.Header().Set("Authorization", "Bearer "+userID)
-		ctx := context.WithValue(r.Context(), "userID", userID)
+		ctx := context.WithValue(r.Context(), UserIDKey, userID)
 		r = r.WithContext(ctx)
 
 		next.ServeHTTP(w, r)

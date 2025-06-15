@@ -46,20 +46,25 @@ func setupTestService(t *testing.T) (*urlservice.URLService, *storage.Storage) {
 	return service, storage
 }
 
+type contextKey string
+
+const userIDKey contextKey = "userID"
+
 func createRequestWithUserID(method, url string, body io.Reader) *http.Request {
 	req := httptest.NewRequest(method, url, body)
-	ctx := context.WithValue(req.Context(), "userID", "test-user-id")
+	ctx := context.WithValue(req.Context(), userIDKey, "test-user-id")
 	return req.WithContext(ctx)
 }
+
 func Test_redirectURL(t *testing.T) {
 	service, storage := setupTestService(t)
 
 	id := "testID123"
 	originalURL := "https://google.com"
-	userId := "123"
+	userID := "123"
 
 	// Явно сохраняем тестовый URL
-	if err := storage.Save(id, originalURL, userId); err != nil {
+	if err := storage.Save(id, originalURL, userID); err != nil {
 		t.Fatalf("Failed to save test URL: %v", err)
 	}
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/middleware"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/repository/postgres"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/util"
@@ -76,7 +77,7 @@ func (s *URLService) Ping(w http.ResponseWriter, r *http.Request) {
 func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("ShortenURL started")
 	defer fmt.Println("ShortenURL completed")
-	userID, ok := r.Context().Value("userID").(string)
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	log.Printf("Shortening URL for user: %s", userID)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -174,7 +175,7 @@ func (s *URLService) RedirectURL(w http.ResponseWriter, r *http.Request, id stri
 }
 
 func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value("userID").(string)
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	if !ok {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
@@ -274,7 +275,7 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 
 func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 	// Получаем userID из контекста
-	userID, ok := r.Context().Value("userID").(string)
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -362,7 +363,7 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value("userID").(string)
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	log.Printf("GetUserURLs called with userID: %s", userID)
 	if !ok || userID == "" {
 		w.WriteHeader(http.StatusUnauthorized)
