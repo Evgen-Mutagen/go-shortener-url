@@ -7,6 +7,7 @@ import (
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/lib/pq"
 	"time"
 )
 
@@ -45,6 +46,7 @@ func (r *PostgresRepository) InitTable(ctx context.Context) error {
         id VARCHAR(255) PRIMARY KEY,
         original_url TEXT NOT NULL,
         user_id VARCHAR(255) NOT NULL,
+        is_deleted BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT NOW()
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_original_url ON urls(original_url);
@@ -73,20 +75,22 @@ func (r *PostgresRepository) SaveURL(ctx context.Context, id, originalURL, userI
 	return nil
 }
 
-func (r *PostgresRepository) GetURL(ctx context.Context, id string) (string, error) {
+func (r *PostgresRepository) GetURL(ctx context.Context, id string) (string, bool, error) {
 	var originalURL string
-	query := `SELECT original_url FROM urls WHERE id = $1`
-	err := r.db.QueryRowContext(ctx, query, id).Scan(&originalURL)
+	var isDeleted bool
+	query := `SELECT original_url, is_deleted FROM urls WHERE id = $1`
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&originalURL, &isDeleted)
 	if err == sql.ErrNoRows {
-		return "", nil
+		return "", false, nil
 	}
-	return originalURL, err
+	return originalURL, isDeleted, err
 }
 
 type Tx interface {
 	SaveURL(ctx context.Context, id, originalURL, userID string) error
 	Commit() error
 	Rollback() error
+	MarkURLsAsDeleted(ctx context.Context, userID string, urlIDs []string) error
 }
 
 type pgTx struct {
@@ -153,4 +157,28 @@ func (r *PostgresRepository) GetUserURLs(ctx context.Context, userID string) (ma
 	}
 
 	return result, nil
+}
+
+func (r *PostgresRepository) MarkURLsAsDeleted(ctx context.Context, userID string, urlIDs []string) error {
+	if len(urlIDs) == 0 {
+		return nil
+	}
+
+	query := `UPDATE urls SET is_deleted = TRUE 
+              WHERE id = ANY($1) AND user_id = $2 AND is_deleted = FALSE`
+
+	_, err := r.db.ExecContext(ctx, query, pq.Array(urlIDs), userID)
+	return err
+}
+
+func (t *pgTx) MarkURLsAsDeleted(ctx context.Context, userID string, urlIDs []string) error {
+	if len(urlIDs) == 0 {
+		return nil
+	}
+
+	query := `UPDATE urls SET is_deleted = TRUE 
+              WHERE id = ANY($1) AND user_id = $2 AND is_deleted = FALSE`
+
+	_, err := t.tx.ExecContext(ctx, query, pq.Array(urlIDs), userID)
+	return err
 }

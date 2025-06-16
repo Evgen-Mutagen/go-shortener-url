@@ -59,6 +59,7 @@ func main() {
 	r.Get("/ping", urlService.Ping)
 	r.Post("/api/shorten/batch", urlService.ShortenURLBatch)
 	r.Get("/api/user/urls", urlService.GetUserURLs)
+	r.Delete("/api/user/urls", urlService.DeleteUserURLs)
 
 	loggerInstance.Info("Starting server",
 		zap.String("address", cfg.ServerAddress),

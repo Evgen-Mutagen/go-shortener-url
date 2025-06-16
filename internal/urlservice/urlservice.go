@@ -152,21 +152,28 @@ func (s *URLService) RedirectURL(w http.ResponseWriter, r *http.Request, id stri
 	}
 
 	var url string
+	var isDeleted bool
 	var exists bool
 
 	if s.Repo != nil {
-		originalURL, err := s.Repo.GetURL(r.Context(), id)
+		originalURL, deleted, err := s.Repo.GetURL(r.Context(), id)
 		if err != nil {
 			http.Error(w, "Ошибка получения URL", http.StatusInternalServerError)
 			return
 		}
-		url, exists = originalURL, originalURL != ""
+		url, exists, isDeleted = originalURL, originalURL != "", deleted
 	} else {
 		url, exists = s.storage.Get(id)
+		isDeleted = false
 	}
 
 	if !exists {
 		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
+		return
+	}
+
+	if isDeleted {
+		w.WriteHeader(http.StatusGone)
 		return
 	}
 
@@ -414,5 +421,59 @@ func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(result); err != nil {
 		http.Error(w, "Encoding error", http.StatusInternalServerError)
+	}
+}
+
+func (s *URLService) DeleteUserURLs(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || userID == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	var urlIDs []string
+	if err := json.NewDecoder(r.Body).Decode(&urlIDs); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	go func() {
+		if s.Repo != nil {
+			if err := s.Repo.MarkURLsAsDeleted(context.Background(), userID, urlIDs); err != nil {
+				log.Printf("Failed to mark URLs as deleted: %v", err)
+			}
+		} else {
+			log.Println("Delete operation not supported for file storage")
+		}
+	}()
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (s *URLService) startDeletionWorker() {
+	const batchSize = 100
+	const timeout = 1 * time.Second
+
+	var (
+		batch   []string
+		userID  string
+		timer   = time.NewTimer(timeout)
+		batchCh = make(chan struct{})
+	)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-batchCh:
+			if len(batch) > 0 {
+				if err := s.Repo.MarkURLsAsDeleted(context.Background(), userID, batch); err != nil {
+					log.Printf("Failed to mark URLs as deleted: %v", err)
+				}
+				batch = batch[:0]
+			}
+		case <-timer.C:
+			batchCh <- struct{}{}
+			timer.Reset(timeout)
+		}
 	}
 }
