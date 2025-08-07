@@ -286,3 +286,79 @@ func Test_shortenURLBatch(t *testing.T) {
 		})
 	}
 }
+
+func setupService(t testing.TB) (*urlservice.URLService, *storage.Storage) {
+	tmpFile, err := os.CreateTemp("", "test_storage_*.json")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	cfg := &configs.Config{
+		ServerAddress:   "localhost:8080",
+		BaseURL:         "http://localhost:8080/",
+		FileStoragePath: tmpFile.Name(),
+	}
+
+	storage, err := storage.NewStorage(cfg.FileStoragePath)
+	if err != nil {
+		t.Fatalf("Failed to create storage: %v", err)
+	}
+
+	service, err := urlservice.New(cfg, storage)
+	if err != nil {
+		t.Fatalf("Failed to create service: %v", err)
+	}
+
+	if tb, ok := t.(*testing.T); ok {
+		tb.Cleanup(func() {
+			os.Remove(tmpFile.Name())
+		})
+	}
+
+	return service, storage
+}
+
+// Бенчмарки
+func BenchmarkShortenURL(b *testing.B) {
+	service, _ := setupService(b)
+	url := "https://example.com"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		req := createRequestWithUserID(http.MethodPost, "/", bytes.NewBufferString(url))
+		w := httptest.NewRecorder()
+		service.ShortenURL(w, req)
+	}
+}
+
+func BenchmarkRedirectURL(b *testing.B) {
+	service, storage := setupService(b)
+	id := "testID123"
+	originalURL := "https://google.com"
+	userID := "123"
+	storage.Save(id, originalURL, userID)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/"+id, nil)
+		routeContext := chi.NewRouteContext()
+		routeContext.URLParams.Add("id", id)
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, routeContext))
+		w := httptest.NewRecorder()
+		service.RedirectURL(w, req, id)
+	}
+}
+
+func BenchmarkShortenURLJSON(b *testing.B) {
+	service, _ := setupService(b)
+	body := `{"url":"https://example.com"}`
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		req := createRequestWithUserID(http.MethodPost, "/api/shorten", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		service.ShortenURLJSON(w, req)
+	}
+}

@@ -19,6 +19,8 @@ type Storage struct {
 	filePath string
 	urls     map[string]URLRecord
 	mu       sync.RWMutex
+	file     *os.File
+	encoder  *json.Encoder
 }
 
 var (
@@ -26,9 +28,16 @@ var (
 )
 
 func NewStorage(filePath string) (*Storage, error) {
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, err
+	}
+
 	s := &Storage{
 		filePath: filePath,
 		urls:     make(map[string]URLRecord),
+		file:     file,
+		encoder:  json.NewEncoder(file),
 	}
 
 	if err := s.load(); err != nil {
@@ -50,15 +59,14 @@ func (s *Storage) Save(shortURL, originalURL, userID string) error {
 	}
 
 	s.urls[shortURL] = record
+	return s.encoder.Encode(record)
+}
 
-	file, err := os.OpenFile(s.filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
+func (s *Storage) Close() error {
+	if s.file != nil {
+		return s.file.Close()
 	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	return encoder.Encode(record)
+	return nil
 }
 
 func (s *Storage) Get(shortURL string) (string, bool) {
