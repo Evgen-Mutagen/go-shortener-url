@@ -16,6 +16,8 @@ import (
 type contextKey string
 
 const (
+	// UserIDKey используется как ключ для хранения ID пользователя в контексте
+	// Значение: "userID"
 	UserIDKey     contextKey = "userID"
 	cookieName               = "user_id"
 	secretKey                = "your-secret-key"

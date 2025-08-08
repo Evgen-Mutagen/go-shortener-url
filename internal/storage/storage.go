@@ -25,6 +25,7 @@ type Storage struct {
 	encoder  *json.Encoder
 }
 
+// ErrURLConflict урл уже существует
 var (
 	ErrURLConflict = fmt.Errorf("URL already exists")
 )
@@ -66,6 +67,7 @@ func (s *Storage) Save(shortURL, originalURL, userID string) error {
 	return s.encoder.Encode(record)
 }
 
+// Close закрывает при чтении
 func (s *Storage) Close() error {
 	if s.file != nil {
 		return s.file.Close()
@@ -142,6 +144,7 @@ func (s *Storage) load() error {
 	return nil
 }
 
+// SaveBatch сохранение урл в батчовом режиме
 func (s *Storage) SaveBatch(urls map[string]string, userID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

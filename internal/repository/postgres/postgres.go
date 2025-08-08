@@ -155,6 +155,7 @@ type pgTx struct {
 	tx *sql.Tx
 }
 
+// SaveURL сохраняет урл
 func (t *pgTx) SaveURL(ctx context.Context, id, originalURL, userID string) error {
 	query := `INSERT INTO urls (id, original_url, user_id) VALUES ($1, $2, $3)`
 	_, err := t.tx.ExecContext(ctx, query, id, originalURL, userID)
@@ -167,10 +168,12 @@ func (t *pgTx) SaveURL(ctx context.Context, id, originalURL, userID string) erro
 	return nil
 }
 
+// Commit подтверждает транзакцию
 func (t *pgTx) Commit() error {
 	return t.tx.Commit()
 }
 
+// Rollback откатывает транзакцию
 func (t *pgTx) Rollback() error {
 	return t.tx.Rollback()
 }
@@ -264,6 +267,7 @@ func (r *PostgresRepository) MarkURLsAsDeleted(ctx context.Context, userID strin
 	return err
 }
 
+// MarkURLsAsDeleted помечает URL пользователя как удаленные в рамках транзакции
 func (t *pgTx) MarkURLsAsDeleted(ctx context.Context, userID string, urlIDs []string) error {
 	if len(urlIDs) == 0 {
 		return nil

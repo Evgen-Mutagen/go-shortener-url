@@ -68,6 +68,7 @@ func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 	return w.gz.Write(b)
 }
 
+// WriteHeader перехватывает вызов установки HTTP статус-кода и инициализирует gzip writer при необходимости
 func (w *gzipResponseWriter) WriteHeader(status int) {
 	if w.gz == nil && strings.Contains(w.Header().Get("Content-Encoding"), "gzip") {
 		w.buf = &bytes.Buffer{}
