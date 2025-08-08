@@ -28,6 +28,7 @@ type URLService struct {
 	Repo      *postgres.PostgresRepository
 }
 
+// BatchRequestItem элемент пакетного запроса
 type BatchRequestItem struct {
 	CorrelationID string `json:"correlation_id"`
 	OriginalURL   string `json:"original_url"`

@@ -13,10 +13,22 @@ import (
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
 )
 
+// PostgresRepository предоставляет доступ к данным URL в PostgreSQL
+//
+// Поля:
+//   - db: подключение к базе данных
 type PostgresRepository struct {
 	db *sql.DB
 }
 
+// New создает новый экземпляр PostgresRepository
+//
+// Параметры:
+//   - dsn: строка подключения к PostgreSQL (Data Source Name)
+//
+// Возвращает:
+//   - *PostgresRepository: инициализированный репозиторий
+//   - error: ошибка подключения к БД
 func New(dsn string) (*PostgresRepository, error) {
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
@@ -34,14 +46,32 @@ func New(dsn string) (*PostgresRepository, error) {
 	return &PostgresRepository{db: db}, nil
 }
 
+// Close освобождает ресурсы подключения к БД
+//
+// Возвращает:
+//   - error: ошибка при закрытии подключения
 func (r *PostgresRepository) Close() error {
 	return r.db.Close()
 }
 
+// Ping проверяет доступность базы данных
+//
+// Параметры:
+//   - ctx: контекст выполнения
+//
+// Возвращает:
+//   - error: ошибка при проверке подключения
 func (r *PostgresRepository) Ping(ctx context.Context) error {
 	return r.db.PingContext(ctx)
 }
 
+// InitTable создает необходимые таблицы и индексы, если они не существуют
+//
+// Параметры:
+//   - ctx: контекст выполнения
+//
+// Возвращает:
+//   - error: ошибка при инициализации таблиц
 func (r *PostgresRepository) InitTable(ctx context.Context) error {
 	query := `
     CREATE TABLE IF NOT EXISTS urls (
@@ -58,6 +88,16 @@ func (r *PostgresRepository) InitTable(ctx context.Context) error {
 	return err
 }
 
+// SaveURL сохраняет связь между коротким и оригинальным URL
+//
+// Параметры:
+//   - ctx: контекст выполнения
+//   - id: короткий идентификатор URL
+//   - originalURL: оригинальный URL
+//   - userID: идентификатор пользователя
+//
+// Возвращает:
+//   - error: ErrURLConflict если URL уже существует, либо другая ошибка БД
 func (r *PostgresRepository) SaveURL(ctx context.Context, id, originalURL, userID string) error {
 	query := `INSERT INTO urls (id, original_url, user_id) VALUES ($1, $2, $3)`
 	_, err := r.db.ExecContext(ctx, query, id, originalURL, userID)
@@ -77,6 +117,16 @@ func (r *PostgresRepository) SaveURL(ctx context.Context, id, originalURL, userI
 	return nil
 }
 
+// GetURL возвращает оригинальный URL по его идентификатору
+//
+// Параметры:
+//   - ctx: контекст выполнения
+//   - id: короткий идентификатор URL
+//
+// Возвращает:
+//   - string: оригинальный URL
+//   - bool: флаг удаления URL (true если URL помечен как удаленный)
+//   - error: ошибка при выполнении запроса
 func (r *PostgresRepository) GetURL(ctx context.Context, id string) (string, bool, error) {
 	var originalURL string
 	var isDeleted bool
@@ -88,13 +138,19 @@ func (r *PostgresRepository) GetURL(ctx context.Context, id string) (string, boo
 	return originalURL, isDeleted, err
 }
 
+// Tx представляет интерфейс для работы с транзакциями
 type Tx interface {
+	// SaveURL сохраняет URL в рамках транзакции
 	SaveURL(ctx context.Context, id, originalURL, userID string) error
+	// Commit подтверждает транзакцию
 	Commit() error
+	// Rollback откатывает транзакцию
 	Rollback() error
+	// MarkURLsAsDeleted помечает URL как удаленные
 	MarkURLsAsDeleted(ctx context.Context, userID string, urlIDs []string) error
 }
 
+// pgTx реализует Tx для PostgreSQL
 type pgTx struct {
 	tx *sql.Tx
 }
@@ -119,6 +175,14 @@ func (t *pgTx) Rollback() error {
 	return t.tx.Rollback()
 }
 
+// BeginTx начинает новую транзакцию
+//
+// Параметры:
+//   - ctx: контекст выполнения
+//
+// Возвращает:
+//   - Tx: интерфейс транзакции
+//   - error: ошибка при начале транзакции
 func (r *PostgresRepository) BeginTx(ctx context.Context) (Tx, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -127,6 +191,15 @@ func (r *PostgresRepository) BeginTx(ctx context.Context) (Tx, error) {
 	return &pgTx{tx: tx}, nil
 }
 
+// FindExistingURL ищет существующий короткий URL для оригинального URL
+//
+// Параметры:
+//   - ctx: контекст выполнения
+//   - originalURL: оригинальный URL для поиска
+//
+// Возвращает:
+//   - string: найденный короткий идентификатор (пустая строка если не найден)
+//   - error: ошибка при выполнении запроса
 func (r *PostgresRepository) FindExistingURL(ctx context.Context, originalURL string) (string, error) {
 	var id string
 	query := `SELECT id FROM urls WHERE original_url = $1`
@@ -137,6 +210,15 @@ func (r *PostgresRepository) FindExistingURL(ctx context.Context, originalURL st
 	return id, err
 }
 
+// GetUserURLs возвращает все URL пользователя
+//
+// Параметры:
+//   - ctx: контекст выполнения
+//   - userID: идентификатор пользователя
+//
+// Возвращает:
+//   - map[string]string: карта [короткий URL]оригинальный URL
+//   - error: ошибка при выполнении запроса
 func (r *PostgresRepository) GetUserURLs(ctx context.Context, userID string) (map[string]string, error) {
 	query := `SELECT id, original_url FROM urls WHERE user_id = $1`
 	rows, err := r.db.QueryContext(ctx, query, userID)
@@ -161,6 +243,15 @@ func (r *PostgresRepository) GetUserURLs(ctx context.Context, userID string) (ma
 	return result, nil
 }
 
+// MarkURLsAsDeleted помечает URL пользователя как удаленные
+//
+// Параметры:
+//   - ctx: контекст выполнения
+//   - userID: идентификатор пользователя
+//   - urlIDs: список идентификаторов URL для удаления
+//
+// Возвращает:
+//   - error: ошибка при выполнении запроса
 func (r *PostgresRepository) MarkURLsAsDeleted(ctx context.Context, userID string, urlIDs []string) error {
 	if len(urlIDs) == 0 {
 		return nil

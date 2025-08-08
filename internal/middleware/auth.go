@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// UserIDKey тип для ключа контекста с ID пользователя
 type contextKey string
 
 const (
@@ -21,6 +22,7 @@ const (
 	cookieExpires            = 24 * time.Hour * 30
 )
 
+// AuthMiddleware middleware для аутентификации пользователей
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(cookieName)
@@ -41,6 +43,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// validateCookie проверяет подпись куки
 func validateCookie(cookie *http.Cookie) bool {
 	parts := strings.Split(cookie.Value, ".")
 	if len(parts) != 2 {

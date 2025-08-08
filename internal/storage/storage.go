@@ -8,6 +8,7 @@ import (
 	"sync"
 )
 
+// URLRecord представляет запись о URL в хранилище
 type URLRecord struct {
 	UUID        string `json:"uuid"`
 	ShortURL    string `json:"short_url"`
@@ -28,6 +29,7 @@ var (
 	ErrURLConflict = fmt.Errorf("URL already exists")
 )
 
+// NewStorage создает новое хранилище
 func NewStorage(filePath string) (*Storage, error) {
 	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {

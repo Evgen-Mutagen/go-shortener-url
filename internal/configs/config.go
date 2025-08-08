@@ -17,6 +17,7 @@ type Config struct {
 	DatabaseDSN     string `env:"DATABASE_DSN" envDefault:""`                        // DSN для подключения к БД
 }
 
+// LoadConfig используется для загрузки конфига
 func LoadConfig() (*Config, error) {
 	cfg := &Config{}
 
