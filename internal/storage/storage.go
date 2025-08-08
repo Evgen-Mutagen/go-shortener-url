@@ -15,6 +15,7 @@ type URLRecord struct {
 	UserID      string `json:"user_id"`
 }
 
+// Storage определяет интерфейс для работы с хранилищем URL
 type Storage struct {
 	filePath string
 	urls     map[string]URLRecord
@@ -47,6 +48,7 @@ func NewStorage(filePath string) (*Storage, error) {
 	return s, nil
 }
 
+// Save сохраняет связь между коротким и оригинальным URL
 func (s *Storage) Save(shortURL, originalURL, userID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -69,6 +71,7 @@ func (s *Storage) Close() error {
 	return nil
 }
 
+// Get возвращает оригинальный URL по короткому идентификатору
 func (s *Storage) Get(shortURL string) (string, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -164,6 +167,7 @@ func (s *Storage) SaveBatch(urls map[string]string, userID string) error {
 	return nil
 }
 
+// GetUserURLs возвращает все URL пользователя
 func (s *Storage) GetUserURLs(userID string) map[string]string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

@@ -8,11 +8,13 @@ import (
 	"github.com/caarlos0/env/v6"
 )
 
+// Config содержит настройки приложения
+// Может быть загружен из переменных окружения или флагов командной строки
 type Config struct {
-	ServerAddress   string `env:"SERVER_ADDRESS" envDefault:"localhost:8080"`
-	BaseURL         string `env:"BASE_URL" envDefault:"http://localhost:8080/"`
-	FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"./url_storage.json"`
-	DatabaseDSN     string `env:"DATABASE_DSN" envDefault:""`
+	ServerAddress   string `env:"SERVER_ADDRESS" envDefault:"localhost:8080"`        // Адрес HTTP сервера
+	BaseURL         string `env:"BASE_URL" envDefault:"http://localhost:8080/"`      // Базовый URL для сокращённых ссылок
+	FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"./url_storage.json"` // Путь к файлу хранилища
+	DatabaseDSN     string `env:"DATABASE_DSN" envDefault:""`                        // DSN для подключения к БД
 }
 
 func LoadConfig() (*Config, error) {

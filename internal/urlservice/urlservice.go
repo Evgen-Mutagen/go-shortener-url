@@ -20,6 +20,7 @@ import (
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/util"
 )
 
+// URLService предоставляет методы для работы с сервисом сокращённых URL
 type URLService struct {
 	cfg       *configs.Config
 	storage   *storage.Storage
@@ -37,6 +38,14 @@ type BatchResponseItem struct {
 	ShortURL      string `json:"short_url"`
 }
 
+// New создает новый экземпляр URLService
+// Принимает:
+//   - cfg: конфигурация сервиса
+//   - storage: хранилище URL
+//
+// Возвращает:
+//   - *URLService: инициализированный сервис
+//   - error: ошибка инициализации
 func New(cfg *configs.Config, storage *storage.Storage) (*URLService, error) {
 	var repo *postgres.PostgresRepository
 	var err error
@@ -62,6 +71,10 @@ func New(cfg *configs.Config, storage *storage.Storage) (*URLService, error) {
 	}, nil
 }
 
+// Ping обрабатывает запрос проверки доступности сервиса
+// Возвращает:
+//   - 200 OK: если сервис доступен
+//   - 500 Internal Server Error: если есть проблемы
 func (s *URLService) Ping(w http.ResponseWriter, r *http.Request) {
 	if s.Repo == nil {
 		http.Error(w, "Database not configured", http.StatusInternalServerError)
@@ -76,6 +89,17 @@ func (s *URLService) Ping(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// ShortenURL обрабатывает запрос на сокращение URL из plain text
+// Формат запроса:
+//
+//	POST /
+//	Content-Type: text/plain
+//	Тело: оригинальный URL
+//
+// Возвращает:
+//   - 201 Created: с сокращенным URL в теле
+//   - 400 Bad Request: при неверном запросе
+//   - 409 Conflict: если URL уже сокращен
 func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("ShortenURL started")
 	defer fmt.Println("ShortenURL completed")
@@ -147,6 +171,15 @@ func (s *URLService) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fmt.Sprintf("%s/%s", strings.TrimSuffix(s.cfg.BaseURL, "/"), id)))
 }
 
+// RedirectURL выполняет перенаправление по сокращенному URL
+// Формат запроса:
+//
+//	GET /{id}
+//
+// Возвращает:
+//   - 307 Temporary Redirect: с Location на оригинальный URL
+//   - 400 Bad Request: при неверном ID
+//   - 410 Gone: если ссылка удалена
 func (s *URLService) RedirectURL(w http.ResponseWriter, r *http.Request, id string) {
 	if id == "" {
 		http.Error(w, "ID is required", http.StatusBadRequest)
@@ -183,6 +216,17 @@ func (s *URLService) RedirectURL(w http.ResponseWriter, r *http.Request, id stri
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
+// ShortenURLJSON обрабатывает JSON-запрос на сокращение URL
+// Формат запроса:
+//
+//	POST /api/shorten
+//	Content-Type: application/json
+//	Тело: {"url": "оригинальный_URL"}
+//
+// Возвращает:
+//   - 201 Created: {"result": "сокращенный_URL"}
+//   - 400 Bad Request: при неверном JSON
+//   - 409 Conflict: если URL уже сокращен
 func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	if !ok {
@@ -282,6 +326,16 @@ func (s *URLService) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ShortenURLBatch обрабатывает пакетный запрос на сокращение URL
+// Формат запроса:
+//
+//	POST /api/shorten/batch
+//	Content-Type: application/json
+//	Тело: [{"correlation_id": "id1", "original_url": "url1"}, ...]
+//
+// Возвращает:
+//   - 201 Created: [{"correlation_id": "id1", "short_url": "short_url1"}, ...]
+//   - 400 Bad Request: при неверном запросе
 func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 	// Получаем userID из контекста
 	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
@@ -371,6 +425,15 @@ func (s *URLService) ShortenURLBatch(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetUserURLs возвращает все сокращенные URL пользователя
+// Формат запроса:
+//
+//	GET /api/user/urls
+//
+// Возвращает:
+//   - 200 OK: [{"short_url": "...", "original_url": "..."}, ...]
+//   - 204 No Content: если URL отсутствуют
+//   - 401 Unauthorized: если пользователь не аутентифицирован
 func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	log.Printf("GetUserURLs called with userID: %s", userID)
@@ -426,6 +489,15 @@ func (s *URLService) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// DeleteUserURLs помечает URL пользователя как удаленные (асинхронно)
+// Формат запроса:
+//
+//	DELETE /api/user/urls
+//	Тело: ["id1", "id2", ...]
+//
+// Возвращает:
+//   - 202 Accepted: запрос принят в обработку
+//   - 401 Unauthorized: если пользователь не аутентифицирован
 func (s *URLService) DeleteUserURLs(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	if !ok || userID == "" {
@@ -452,6 +524,9 @@ func (s *URLService) DeleteUserURLs(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// startDeletionWorker запускает фоновый worker для удаления URL
+// Работает в отдельной горутине
+// Обрабатывает URL пачками по batchSize или по таймауту timeout
 func (s *URLService) startDeletionWorker() {
 	const batchSize = 100
 	const timeout = 1 * time.Second
