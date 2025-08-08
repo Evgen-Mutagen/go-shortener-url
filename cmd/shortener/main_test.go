@@ -4,17 +4,19 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
-	"github.com/Evgen-Mutagen/go-shortener-url/internal/middleware"
-	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
-	"github.com/Evgen-Mutagen/go-shortener-url/internal/urlservice"
-	"github.com/go-chi/chi/v5"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/middleware"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/urlservice"
 )
 
 func setupTestService(t *testing.T) (*urlservice.URLService, *storage.Storage) {

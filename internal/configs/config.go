@@ -3,8 +3,9 @@ package configs
 import (
 	"flag"
 	"fmt"
-	"github.com/caarlos0/env/v6"
 	"strings"
+
+	"github.com/caarlos0/env/v6"
 )
 
 type Config struct {

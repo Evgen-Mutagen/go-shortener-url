@@ -3,21 +3,23 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/Evgen-Mutagen/go-shortener-url/internal/compress"
-	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
-	"github.com/Evgen-Mutagen/go-shortener-url/internal/logger"
-	"github.com/Evgen-Mutagen/go-shortener-url/internal/middleware"
-	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
-	"github.com/Evgen-Mutagen/go-shortener-url/internal/urlservice"
-	"github.com/go-chi/chi/v5"
-	_ "github.com/jackc/pgx/v5/stdlib"
-	"go.uber.org/zap"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/go-chi/chi/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"go.uber.org/zap"
+
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/compress"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/logger"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/middleware"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/urlservice"
 )
 
 var (

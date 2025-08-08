@@ -4,18 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
-	"github.com/Evgen-Mutagen/go-shortener-url/internal/middleware"
-	"github.com/Evgen-Mutagen/go-shortener-url/internal/repository/postgres"
-	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
-	"github.com/Evgen-Mutagen/go-shortener-url/internal/util"
-	"github.com/jackc/pgerrcode"
-	"github.com/jackc/pgx/v5/pgconn"
 	"io"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/middleware"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/repository/postgres"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/util"
 )
 
 type URLService struct {
