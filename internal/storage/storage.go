@@ -78,25 +78,25 @@ func (s *Storage) Close() error {
 // Get возвращает оригинальный URL по короткому идентификатору
 func (s *Storage) Get(shortURL string) (string, bool) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
+
+	if record, exists := s.urls[shortURL]; exists {
+		s.mu.RUnlock()
+		return record.OriginalURL, true
+	}
+	s.mu.RUnlock()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	if record, exists := s.urls[shortURL]; exists {
 		return record.OriginalURL, true
 	}
 
-	file, err := os.Open(s.filePath)
-	if err != nil {
-		return "", false
-	}
-	defer file.Close()
-
-	decoder := json.NewDecoder(file)
-	for decoder.More() {
-		var record URLRecord
-		if err := decoder.Decode(&record); err != nil {
-			continue
+	if len(s.urls) == 0 {
+		if err := s.load(); err != nil {
+			return "", false
 		}
-		if record.ShortURL == shortURL {
+		if record, exists := s.urls[shortURL]; exists {
 			return record.OriginalURL, true
 		}
 	}
