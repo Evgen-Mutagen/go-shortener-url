@@ -3,16 +3,21 @@ package configs
 import (
 	"flag"
 	"fmt"
-	"github.com/caarlos0/env/v6"
 	"strings"
+
+	"github.com/caarlos0/env/v6"
 )
 
+// Config содержит настройки приложения
+// Может быть загружен из переменных окружения или флагов командной строки
 type Config struct {
-	ServerAddress   string `env:"SERVER_ADDRESS" envDefault:"localhost:8080"`
-	BaseURL         string `env:"BASE_URL" envDefault:"http://localhost:8080/"`
-	FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"./url_storage.json"`
+	ServerAddress   string `env:"SERVER_ADDRESS" envDefault:"localhost:8080"`        // Адрес HTTP сервера
+	BaseURL         string `env:"BASE_URL" envDefault:"http://localhost:8080/"`      // Базовый URL для сокращённых ссылок
+	FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"./url_storage.json"` // Путь к файлу хранилища
+	DatabaseDSN     string `env:"DATABASE_DSN" envDefault:""`                        // DSN для подключения к БД
 }
 
+// LoadConfig используется для загрузки конфига
 func LoadConfig() (*Config, error) {
 	cfg := &Config{}
 
@@ -23,18 +28,21 @@ func LoadConfig() (*Config, error) {
 	addressFlag := flag.String("a", "", "HTTP server address (host:port)")
 	baseURLFlag := flag.String("b", "", "Base URL for shortened links")
 	fileStorageFlag := flag.String("f", "", "Path to file storage")
+	databaseFlag := flag.String("d", "", "Database connection string")
 
 	flag.Parse()
 
-	if *addressFlag != "" && cfg.ServerAddress == "localhost:8080" {
+	if *addressFlag != "" {
 		cfg.ServerAddress = *addressFlag
 	}
-	if *baseURLFlag != "" && cfg.BaseURL == "http://localhost:8080/" {
+	if *baseURLFlag != "" {
 		cfg.BaseURL = *baseURLFlag
 	}
-
 	if *fileStorageFlag != "" {
 		cfg.FileStoragePath = *fileStorageFlag
+	}
+	if *databaseFlag != "" {
+		cfg.DatabaseDSN = *databaseFlag
 	}
 
 	serverAddr := strings.TrimPrefix(cfg.ServerAddress, "http://")
@@ -47,9 +55,5 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("адрес и урл не предоставлены")
 	}
 
-	return &Config{
-		ServerAddress:   serverAddr,
-		BaseURL:         baseURL,
-		FileStoragePath: cfg.FileStoragePath,
-	}, nil
+	return cfg, nil
 }

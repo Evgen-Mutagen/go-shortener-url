@@ -14,6 +14,7 @@ var gzipPool = sync.Pool{
 	},
 }
 
+// GzipCompress middleware сжимает ответы в gzip
 func GzipCompress(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -52,12 +53,14 @@ func GzipCompress(next http.Handler) http.Handler {
 	})
 }
 
+// gzipResponseWriter оборачивает http.ResponseWriter для gzip сжатия
 type gzipResponseWriter struct {
 	http.ResponseWriter
 	gz  *gzip.Writer
 	buf *bytes.Buffer
 }
 
+// Write реализует интерфейс io.Writer для gzip сжатия
 func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 	if w.gz == nil {
 		return w.ResponseWriter.Write(b)
@@ -65,6 +68,7 @@ func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 	return w.gz.Write(b)
 }
 
+// WriteHeader перехватывает вызов установки HTTP статус-кода и инициализирует gzip writer при необходимости
 func (w *gzipResponseWriter) WriteHeader(status int) {
 	if w.gz == nil && strings.Contains(w.Header().Get("Content-Encoding"), "gzip") {
 		w.buf = &bytes.Buffer{}
@@ -74,6 +78,7 @@ func (w *gzipResponseWriter) WriteHeader(status int) {
 	w.ResponseWriter.WriteHeader(status)
 }
 
+// Close освобождает ресурсы gzip writer
 func (w *gzipResponseWriter) Close() {
 	if w.gz != nil {
 		w.gz.Close()
