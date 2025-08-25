@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -28,24 +29,27 @@ var (
 	urlService *urlservice.URLService
 )
 
-func main() {
+func run() error {
 	var err error
 	cfg, err = configs.LoadConfig()
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	urlStore, err = storage.NewStorage(cfg.FileStoragePath)
 	if err != nil {
-		panic(fmt.Errorf("не удалось инициализировать хранилище: %v", err))
+		return fmt.Errorf("failed to initialize storage: %w", err)
 	}
 
 	urlService, err = urlservice.New(cfg, urlStore)
 	if err != nil {
-		panic(fmt.Errorf("failed to create URL service: %v", err))
+		return fmt.Errorf("failed to create URL service: %w", err)
 	}
 
-	loggerInstance, _ := zap.NewProduction()
+	loggerInstance, err := zap.NewProduction()
+	if err != nil {
+		return fmt.Errorf("failed to create logger: %w", err)
+	}
 	defer loggerInstance.Sync()
 
 	r := chi.NewRouter()
@@ -79,32 +83,52 @@ func main() {
 		Handler: r,
 	}
 
+	// Запуск pprof
 	go func() {
-		http.ListenAndServe("localhost:6060", nil)
-	}()
-
-	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			loggerInstance.Fatal("Server error", zap.Error(err))
+		if err := http.ListenAndServe("localhost:6060", nil); err != nil {
+			loggerInstance.Error("Pprof server error", zap.Error(err))
 		}
 	}()
 
+	// Запуск основного сервера
+	serverErr := make(chan error, 1)
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			serverErr <- err
+		}
+	}()
+
+	// Ожидание сигналов завершения
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	<-quit
 
+	select {
+	case err := <-serverErr:
+		return fmt.Errorf("server error: %w", err)
+	case <-quit:
+		loggerInstance.Info("Shutting down server...")
+	}
+
+	// Graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		loggerInstance.Error("Server shutdown error", zap.Error(err))
+		return fmt.Errorf("server shutdown error: %w", err)
 	}
 
 	if urlService.Repo != nil {
 		if err := urlService.Repo.Close(); err != nil {
-			loggerInstance.Error("Failed to close database connection", zap.Error(err))
+			return fmt.Errorf("failed to close database connection: %w", err)
 		}
 	}
 
 	loggerInstance.Info("Server stopped")
+	return nil
+}
+
+func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
 }
