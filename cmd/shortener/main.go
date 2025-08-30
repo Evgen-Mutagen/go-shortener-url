@@ -24,12 +24,38 @@ import (
 )
 
 var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
+var (
 	urlStore   *storage.Storage
 	cfg        *configs.Config
 	urlService *urlservice.URLService
 )
 
+// printBuildInfo выводит информацию о версии, дате сборки и коммите
+func printBuildInfo() {
+	if buildVersion == "" {
+		buildVersion = "N/A"
+	}
+	if buildDate == "" {
+		buildDate = "N/A"
+	}
+	if buildCommit == "" {
+		buildCommit = "N/A"
+	}
+
+	fmt.Printf("Build version: %s\n", buildVersion)
+	fmt.Printf("Build date: %s\n", buildDate)
+	fmt.Printf("Build commit: %s\n", buildCommit)
+}
+
 func run() error {
+	// Выводим информацию о сборке при старте
+	printBuildInfo()
+
 	var err error
 	cfg, err = configs.LoadConfig()
 	if err != nil {

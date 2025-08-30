@@ -57,6 +57,77 @@ func createRequestWithUserID(method, url string, body io.Reader) *http.Request {
 	return req.WithContext(ctx)
 }
 
+func TestPrintBuildInfo(t *testing.T) {
+	originalVersion := buildVersion
+	originalDate := buildDate
+	originalCommit := buildCommit
+
+	defer func() {
+		buildVersion = originalVersion
+		buildDate = originalDate
+		buildCommit = originalCommit
+	}()
+
+	tests := []struct {
+		name           string
+		version        string
+		date           string
+		commit         string
+		expectedOutput string
+	}{
+		{
+			name:           "All values set",
+			version:        "1.0.0",
+			date:           "2024-01-01",
+			commit:         "abc123",
+			expectedOutput: "Build version: 1.0.0\nBuild date: 2024-01-01\nBuild commit: abc123\n",
+		},
+		{
+			name:           "Empty values",
+			version:        "",
+			date:           "",
+			commit:         "",
+			expectedOutput: "Build version: N/A\nBuild date: N/A\nBuild commit: N/A\n",
+		},
+		{
+			name:           "Mixed values",
+			version:        "2.0.0",
+			date:           "",
+			commit:         "def456",
+			expectedOutput: "Build version: 2.0.0\nBuild date: N/A\nBuild commit: def456\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Устанавливаем тестовые значения
+			buildVersion = tt.version
+			buildDate = tt.date
+			buildCommit = tt.commit
+
+			// Захватываем вывод
+			var buf bytes.Buffer
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			// Вызываем функцию
+			printBuildInfo()
+
+			// Восстанавливаем stdout
+			w.Close()
+			os.Stdout = oldStdout
+
+			// Читаем вывод
+			buf.ReadFrom(r)
+			output := buf.String()
+
+			// Проверяем результат
+			assert.Equal(t, tt.expectedOutput, output)
+		})
+	}
+}
+
 func Test_redirectURL(t *testing.T) {
 	service, storage := setupTestService(t)
 
