@@ -70,19 +70,28 @@ import (
 	"golang.org/x/tools/go/analysis/passes/asmdecl"
 	"golang.org/x/tools/go/analysis/passes/assign"
 	"golang.org/x/tools/go/analysis/passes/atomic"
+	"golang.org/x/tools/go/analysis/passes/atomicalign"
 	"golang.org/x/tools/go/analysis/passes/bools"
 	"golang.org/x/tools/go/analysis/passes/buildtag"
 	"golang.org/x/tools/go/analysis/passes/cgocall"
 	"golang.org/x/tools/go/analysis/passes/composite"
 	"golang.org/x/tools/go/analysis/passes/copylock"
+	"golang.org/x/tools/go/analysis/passes/ctrlflow"
+	"golang.org/x/tools/go/analysis/passes/deepequalerrors"
 	"golang.org/x/tools/go/analysis/passes/directive"
 	"golang.org/x/tools/go/analysis/passes/errorsas"
+	"golang.org/x/tools/go/analysis/passes/fieldalignment"
+	"golang.org/x/tools/go/analysis/passes/findcall"
 	"golang.org/x/tools/go/analysis/passes/framepointer"
 	"golang.org/x/tools/go/analysis/passes/httpresponse"
+	"golang.org/x/tools/go/analysis/passes/ifaceassert"
 	"golang.org/x/tools/go/analysis/passes/loopclosure"
 	"golang.org/x/tools/go/analysis/passes/lostcancel"
 	"golang.org/x/tools/go/analysis/passes/nilfunc"
+	"golang.org/x/tools/go/analysis/passes/nilness"
+	"golang.org/x/tools/go/analysis/passes/pkgfact"
 	"golang.org/x/tools/go/analysis/passes/printf"
+	"golang.org/x/tools/go/analysis/passes/shadow"
 	"golang.org/x/tools/go/analysis/passes/shift"
 	"golang.org/x/tools/go/analysis/passes/sigchanyzer"
 	"golang.org/x/tools/go/analysis/passes/sortslice"
@@ -96,6 +105,9 @@ import (
 	"golang.org/x/tools/go/analysis/passes/unsafeptr"
 	"golang.org/x/tools/go/analysis/passes/unusedresult"
 
+	"honnef.co/go/tools/staticcheck"
+	"honnef.co/go/tools/stylecheck"
+
 	"github.com/Evgen-Mutagen/go-shortener-url/cmd/staticlint/noosexit"
 )
 
@@ -105,19 +117,28 @@ func main() {
 		asmdecl.Analyzer,
 		assign.Analyzer,
 		atomic.Analyzer,
+		atomicalign.Analyzer,
 		bools.Analyzer,
 		buildtag.Analyzer,
 		cgocall.Analyzer,
 		composite.Analyzer,
 		copylock.Analyzer,
+		ctrlflow.Analyzer,
+		deepequalerrors.Analyzer,
 		directive.Analyzer,
 		errorsas.Analyzer,
+		fieldalignment.Analyzer,
+		findcall.Analyzer,
 		framepointer.Analyzer,
 		httpresponse.Analyzer,
+		ifaceassert.Analyzer,
 		loopclosure.Analyzer,
 		lostcancel.Analyzer,
 		nilfunc.Analyzer,
+		nilness.Analyzer,
+		pkgfact.Analyzer,
 		printf.Analyzer,
+		shadow.Analyzer,
 		shift.Analyzer,
 		sigchanyzer.Analyzer,
 		sortslice.Analyzer,
@@ -132,13 +153,27 @@ func main() {
 		unusedresult.Analyzer,
 	}
 
+	// SA анализаторы staticcheck
+	var saAnalyzers []*analysis.Analyzer
+	for _, v := range staticcheck.Analyzers {
+		saAnalyzers = append(saAnalyzers, v.Analyzer)
+	}
+
+	// Другие анализаторы staticcheck (не менее одного)
+	var otherStaticcheckAnalyzers []*analysis.Analyzer
+	for _, v := range stylecheck.Analyzers {
+		otherStaticcheckAnalyzers = append(otherStaticcheckAnalyzers, v.Analyzer)
+	}
+
 	// Кастомный анализатор
 	customAnalyzers := []*analysis.Analyzer{
 		noosexit.Analyzer,
 	}
 
 	// Объединяем все анализаторы
-	allAnalyzers := append(standardAnalyzers, customAnalyzers...)
+	allAnalyzers := append(standardAnalyzers, saAnalyzers...)
+	allAnalyzers = append(allAnalyzers, otherStaticcheckAnalyzers...)
+	allAnalyzers = append(allAnalyzers, customAnalyzers...)
 
 	multichecker.Main(allAnalyzers...)
 }
