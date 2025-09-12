@@ -15,6 +15,7 @@ type Config struct {
 	BaseURL         string `env:"BASE_URL" envDefault:"http://localhost:8080/"`      // Базовый URL для сокращённых ссылок
 	FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"./url_storage.json"` // Путь к файлу хранилища
 	DatabaseDSN     string `env:"DATABASE_DSN" envDefault:""`                        // DSN для подключения к БД
+	EnableHTTPS     bool   `env:"ENABLE_HTTPS" envDefault:"false"`                   // Включить HTTPS
 }
 
 // LoadConfig используется для загрузки конфига
@@ -29,6 +30,7 @@ func LoadConfig() (*Config, error) {
 	baseURLFlag := flag.String("b", "", "Base URL for shortened links")
 	fileStorageFlag := flag.String("f", "", "Path to file storage")
 	databaseFlag := flag.String("d", "", "Database connection string")
+	enableHTTPSFlag := flag.Bool("s", false, "Enable HTTPS")
 
 	flag.Parse()
 
@@ -43,6 +45,9 @@ func LoadConfig() (*Config, error) {
 	}
 	if *databaseFlag != "" {
 		cfg.DatabaseDSN = *databaseFlag
+	}
+	if *enableHTTPSFlag {
+		cfg.EnableHTTPS = true
 	}
 
 	serverAddr := strings.TrimPrefix(cfg.ServerAddress, "http://")

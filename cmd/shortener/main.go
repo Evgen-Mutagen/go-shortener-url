@@ -94,14 +94,23 @@ func run() error {
 	r.Get("/api/user/urls", urlService.GetUserURLs)
 	r.Delete("/api/user/urls", urlService.DeleteUserURLs)
 
+	protocol := "HTTP"
+	if cfg.EnableHTTPS {
+		protocol = "HTTPS"
+	}
+
 	loggerInstance.Info("Starting server",
 		zap.String("address", cfg.ServerAddress),
+		zap.String("protocol", protocol),
 	)
 	loggerInstance.Info("Using storage file",
 		zap.String("file", cfg.FileStoragePath),
 	)
 	if cfg.DatabaseDSN != "" {
 		loggerInstance.Info("Database connection enabled")
+	}
+	if cfg.EnableHTTPS {
+		loggerInstance.Info("HTTPS enabled")
 	}
 
 	server := &http.Server{
@@ -119,7 +128,14 @@ func run() error {
 	// Запуск основного сервера
 	serverErr := make(chan error, 1)
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		var err error
+		if cfg.EnableHTTPS {
+			err = server.ListenAndServeTLS("", "")
+		} else {
+			err = server.ListenAndServe()
+		}
+
+		if err != nil && err != http.ErrServerClosed {
 			serverErr <- err
 		}
 	}()
