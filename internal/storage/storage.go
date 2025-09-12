@@ -67,6 +67,20 @@ func (s *Storage) Save(shortURL, originalURL, userID string) error {
 	return s.encoder.Encode(record)
 }
 
+// Flush принудительно сохраняет все данные в файл
+func (s *Storage) Flush() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Закрываем текущий файл
+	if s.file != nil {
+		s.file.Close()
+	}
+
+	// Сохраняем все данные
+	return s.save()
+}
+
 // Close закрывает при чтении
 func (s *Storage) Close() error {
 	if s.file != nil {

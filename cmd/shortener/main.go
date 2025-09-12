@@ -142,7 +142,7 @@ func run() error {
 
 	// Ожидание сигналов завершения
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 
 	select {
 	case err := <-serverErr:
@@ -157,6 +157,15 @@ func run() error {
 
 	if err := server.Shutdown(ctx); err != nil {
 		return fmt.Errorf("server shutdown error: %w", err)
+	}
+
+	// Сохраняем все несохраненные данные из файлового хранилища
+	if urlStore != nil {
+		if err := urlStore.Flush(); err != nil {
+			loggerInstance.Error("Failed to flush storage data", zap.Error(err))
+		} else {
+			loggerInstance.Info("Storage data flushed successfully")
+		}
 	}
 
 	if urlService.Repo != nil {
