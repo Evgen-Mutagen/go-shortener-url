@@ -526,6 +526,48 @@ func (s *URLService) DeleteUserURLs(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// GetStats возвращает статистику сервиса
+// Формат запроса:
+//
+//	GET /api/internal/stats
+//
+// Возвращает:
+//   - 200 OK: {"urls": <int>, "users": <int>}
+//   - 403 Forbidden: если IP не в доверенной подсети
+//   - 500 Internal Server Error: при ошибке получения статистики
+func (s *URLService) GetStats(w http.ResponseWriter, r *http.Request) {
+	var urlCount, userCount int
+	var err error
+
+	if s.Repo != nil {
+		urlCount, userCount, err = s.Repo.GetStats(r.Context())
+		if err != nil {
+			http.Error(w, "Failed to get stats from database", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		urlCount, userCount, err = s.storage.GetStats()
+		if err != nil {
+			http.Error(w, "Failed to get stats from storage", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	response := struct {
+		URLs  int `json:"urls"`
+		Users int `json:"users"`
+	}{
+		URLs:  urlCount,
+		Users: userCount,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
+}
+
 // startDeletionWorker запускает фоновый worker для удаления URL
 // Работает в отдельной горутине
 // Обрабатывает URL пачками по batchSize или по таймауту timeout

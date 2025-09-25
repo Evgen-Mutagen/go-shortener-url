@@ -94,6 +94,11 @@ func run() error {
 	r.Get("/api/user/urls", urlService.GetUserURLs)
 	r.Delete("/api/user/urls", urlService.DeleteUserURLs)
 
+	r.Route("/api/internal", func(r chi.Router) {
+		r.Use(middleware.TrustedSubnetMiddleware(cfg))
+		r.Get("/stats", urlService.GetStats)
+	})
+
 	protocol := "HTTP"
 	if cfg.EnableHTTPS {
 		protocol = "HTTPS"

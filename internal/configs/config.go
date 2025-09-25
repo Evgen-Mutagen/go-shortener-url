@@ -17,6 +17,7 @@ type JSONConfig struct {
 	FileStoragePath string `json:"file_storage_path"`
 	DatabaseDSN     string `json:"database_dsn"`
 	EnableHTTPS     bool   `json:"enable_https"`
+	TrustedSubnet   string `json:"trusted_subnet"`
 }
 
 // loadJSONConfig загружает конфигурацию из JSON файла
@@ -46,6 +47,7 @@ type Config struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"./url_storage.json"` // Путь к файлу хранилища
 	DatabaseDSN     string `env:"DATABASE_DSN" envDefault:""`                        // DSN для подключения к БД
 	EnableHTTPS     bool   `env:"ENABLE_HTTPS" envDefault:"false"`                   // Включить HTTPS
+	TrustedSubnet   string `env:"TRUSTED_SUBNET" envDefault:""`                      // Доверенная подсеть для внутренних эндпоинтов
 	ConfigFile      string `env:"CONFIG" envDefault:""`                              // Путь к JSON файлу конфигурации
 }
 
@@ -62,6 +64,7 @@ func LoadConfig() (*Config, error) {
 	fileStorageFlag := flag.String("f", "", "Path to file storage")
 	databaseFlag := flag.String("d", "", "Database connection string")
 	enableHTTPSFlag := flag.Bool("s", false, "Enable HTTPS")
+	trustedSubnetFlag := flag.String("t", "", "Trusted subnet for internal endpoints")
 	configFlag := flag.String("c", "", "Path to JSON config file")
 	configFlagLong := flag.String("config", "", "Path to JSON config file")
 
@@ -96,6 +99,9 @@ func LoadConfig() (*Config, error) {
 		if jsonConfig.DatabaseDSN != "" {
 			cfg.DatabaseDSN = jsonConfig.DatabaseDSN
 		}
+		if jsonConfig.TrustedSubnet != "" {
+			cfg.TrustedSubnet = jsonConfig.TrustedSubnet
+		}
 		// Для булевых значений проверяем, что они были явно установлены в JSON
 		// (поскольку false является значением по умолчанию)
 		cfg.EnableHTTPS = jsonConfig.EnableHTTPS
@@ -113,6 +119,9 @@ func LoadConfig() (*Config, error) {
 	}
 	if *databaseFlag != "" {
 		cfg.DatabaseDSN = *databaseFlag
+	}
+	if *trustedSubnetFlag != "" {
+		cfg.TrustedSubnet = *trustedSubnetFlag
 	}
 	if *enableHTTPSFlag {
 		cfg.EnableHTTPS = true

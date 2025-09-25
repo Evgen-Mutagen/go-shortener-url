@@ -228,3 +228,30 @@ func (r *PostgresRepository) MarkURLsAsDeleted(ctx context.Context, userID strin
 	_, err := r.db.ExecContext(ctx, query, pq.Array(urlIDs), userID)
 	return err
 }
+
+// GetStats возвращает статистику сервиса
+//
+// Параметры:
+//   - ctx: контекст выполнения
+//
+// Возвращает:
+//   - int: количество сокращённых URL
+//   - int: количество пользователей
+//   - error: ошибка при выполнении запроса
+func (r *PostgresRepository) GetStats(ctx context.Context) (int, int, error) {
+	var urlCount, userCount int
+
+	urlQuery := `SELECT COUNT(*) FROM urls WHERE is_deleted = FALSE`
+	err := r.db.QueryRowContext(ctx, urlQuery).Scan(&urlCount)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to count URLs: %w", err)
+	}
+
+	userQuery := `SELECT COUNT(DISTINCT user_id) FROM urls WHERE is_deleted = FALSE`
+	err = r.db.QueryRowContext(ctx, userQuery).Scan(&userCount)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to count users: %w", err)
+	}
+
+	return urlCount, userCount, nil
+}

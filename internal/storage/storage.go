@@ -219,3 +219,25 @@ func (s *Storage) GetUserURLs(userID string) map[string]string {
 
 	return result
 }
+
+// GetStats возвращает статистику сервиса
+func (s *Storage) GetStats() (int, int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if len(s.urls) == 0 {
+		if err := s.load(); err != nil {
+			return 0, 0, fmt.Errorf("failed to load storage data: %w", err)
+		}
+	}
+
+	urlCount := len(s.urls)
+
+	userSet := make(map[string]bool)
+	for _, record := range s.urls {
+		userSet[record.UserID] = true
+	}
+	userCount := len(userSet)
+
+	return urlCount, userCount, nil
+}
