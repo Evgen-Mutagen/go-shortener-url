@@ -27,25 +27,25 @@ func (s *ShortenerServer) RegisterService(server *grpc.Server) {
 
 // ShortenURLRequest запрос на сокращение URL
 type ShortenURLRequest struct {
-	Url    string
-	UserId string
+	URL    string
+	UserID string
 }
 
 // ShortenURLResponse ответ на сокращение URL
 type ShortenURLResponse struct {
-	ShortUrl   string
+	ShortURL   string
 	Error      string
 	StatusCode int32
 }
 
 // GetURLRequest запрос на получение оригинального URL
 type GetURLRequest struct {
-	Id string
+	ID string
 }
 
 // GetURLResponse ответ с оригинальным URL
 type GetURLResponse struct {
-	OriginalUrl string
+	OriginalURL string
 	IsDeleted   bool
 	Error       string
 	StatusCode  int32
@@ -53,20 +53,20 @@ type GetURLResponse struct {
 
 // BatchItem элемент пакетного запроса
 type BatchItem struct {
-	CorrelationId string
-	OriginalUrl   string
+	CorrelationID string
+	OriginalURL   string
 }
 
 // ShortenURLBatchRequest запрос на пакетное сокращение URL
 type ShortenURLBatchRequest struct {
 	Items  []BatchItem
-	UserId string
+	UserID string
 }
 
 // BatchResponseItem элемент ответа на пакетный запрос
 type BatchResponseItem struct {
-	CorrelationId string
-	ShortUrl      string
+	CorrelationID string
+	ShortURL      string
 }
 
 // ShortenURLBatchResponse ответ на пакетное сокращение URL
@@ -78,13 +78,13 @@ type ShortenURLBatchResponse struct {
 
 // GetUserURLsRequest запрос на получение URL пользователя
 type GetUserURLsRequest struct {
-	UserId string
+	UserID string
 }
 
 // UserURL элемент URL пользователя
 type UserURL struct {
-	ShortUrl    string
-	OriginalUrl string
+	ShortURL    string
+	OriginalURL string
 }
 
 // GetUserURLsResponse ответ с URL пользователя
@@ -96,8 +96,8 @@ type GetUserURLsResponse struct {
 
 // DeleteUserURLsRequest запрос на удаление URL пользователя
 type DeleteUserURLsRequest struct {
-	UrlIds []string
-	UserId string
+	URLIds []string
+	UserID string
 }
 
 // DeleteUserURLsResponse ответ на удаление URL
@@ -128,9 +128,9 @@ type GetStatsResponse struct {
 
 // ShortenURL сокращает URL
 func (s *ShortenerServer) ShortenURL(ctx context.Context, req *ShortenURLRequest) (*ShortenURLResponse, error) {
-	result := s.service.ShortenURL(ctx, req.Url, req.UserId)
+	result := s.service.ShortenURL(ctx, req.URL, req.UserID)
 	return &ShortenURLResponse{
-		ShortUrl:   result.ShortURL,
+		ShortURL:   result.ShortURL,
 		Error:      result.Error,
 		StatusCode: int32(result.Status),
 	}, nil
@@ -138,9 +138,9 @@ func (s *ShortenerServer) ShortenURL(ctx context.Context, req *ShortenURLRequest
 
 // GetURL получает оригинальный URL по ID
 func (s *ShortenerServer) GetURL(ctx context.Context, req *GetURLRequest) (*GetURLResponse, error) {
-	result := s.service.GetURL(ctx, req.Id)
+	result := s.service.GetURL(ctx, req.ID)
 	return &GetURLResponse{
-		OriginalUrl: result.OriginalURL,
+		OriginalURL: result.OriginalURL,
 		IsDeleted:   result.IsDeleted,
 		Error:       result.Error,
 		StatusCode:  int32(result.Status),
@@ -152,18 +152,18 @@ func (s *ShortenerServer) ShortenURLBatch(ctx context.Context, req *ShortenURLBa
 	items := make([]service.BatchItem, len(req.Items))
 	for i, item := range req.Items {
 		items[i] = service.BatchItem{
-			CorrelationID: item.CorrelationId,
-			OriginalURL:   item.OriginalUrl,
+			CorrelationID: item.CorrelationID,
+			OriginalURL:   item.OriginalURL,
 		}
 	}
 
-	result := s.service.ShortenURLBatch(ctx, items, req.UserId)
+	result := s.service.ShortenURLBatch(ctx, items, req.UserID)
 
 	responseItems := make([]BatchResponseItem, len(result.Items))
 	for i, item := range result.Items {
 		responseItems[i] = BatchResponseItem{
-			CorrelationId: item.CorrelationID,
-			ShortUrl:      item.ShortURL,
+			CorrelationID: item.CorrelationID,
+			ShortURL:      item.ShortURL,
 		}
 	}
 
@@ -176,13 +176,13 @@ func (s *ShortenerServer) ShortenURLBatch(ctx context.Context, req *ShortenURLBa
 
 // GetUserURLs получает все URL пользователя
 func (s *ShortenerServer) GetUserURLs(ctx context.Context, req *GetUserURLsRequest) (*GetUserURLsResponse, error) {
-	result := s.service.GetUserURLs(ctx, req.UserId)
+	result := s.service.GetUserURLs(ctx, req.UserID)
 
 	urls := make([]UserURL, len(result.URLs))
 	for i, url := range result.URLs {
 		urls[i] = UserURL{
-			ShortUrl:    url.ShortURL,
-			OriginalUrl: url.OriginalURL,
+			ShortURL:    url.ShortURL,
+			OriginalURL: url.OriginalURL,
 		}
 	}
 
@@ -195,7 +195,7 @@ func (s *ShortenerServer) GetUserURLs(ctx context.Context, req *GetUserURLsReque
 
 // DeleteUserURLs помечает URL как удаленные
 func (s *ShortenerServer) DeleteUserURLs(ctx context.Context, req *DeleteUserURLsRequest) (*DeleteUserURLsResponse, error) {
-	result := s.service.DeleteUserURLs(ctx, req.UserId, req.UrlIds)
+	result := s.service.DeleteUserURLs(ctx, req.UserID, req.URLIds)
 	return &DeleteUserURLsResponse{
 		Error:      result.Error,
 		StatusCode: int32(result.Status),

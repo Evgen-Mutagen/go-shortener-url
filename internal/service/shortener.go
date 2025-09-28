@@ -142,6 +142,7 @@ func (s *ShortenerService) ShortenURL(ctx context.Context, url, userID string) S
 		// Сохраняем в файловое хранилище для совместимости
 		if err := s.storage.Save(id, url, userID); err != nil && err != storage.ErrURLConflict {
 			// Логируем ошибку, но не прерываем выполнение
+			_ = err // Игнорируем ошибку для совместимости
 		}
 	} else {
 		id = s.generator.Generate()
