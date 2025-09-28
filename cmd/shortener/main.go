@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -14,11 +15,15 @@ import (
 	"github.com/go-chi/chi/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/compress"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/configs"
+	grpcServer "github.com/Evgen-Mutagen/go-shortener-url/internal/grpc"
+	httpHandlers "github.com/Evgen-Mutagen/go-shortener-url/internal/http"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/logger"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/middleware"
+	"github.com/Evgen-Mutagen/go-shortener-url/internal/service"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/storage"
 	"github.com/Evgen-Mutagen/go-shortener-url/internal/urlservice"
 )
@@ -30,9 +35,12 @@ var (
 )
 
 var (
-	urlStore   *storage.Storage
-	cfg        *configs.Config
-	urlService *urlservice.URLService
+	urlStore             *storage.Storage
+	cfg                  *configs.Config
+	urlService           *urlservice.URLService
+	shortenerService     *service.ShortenerService
+	grpcSrv              *grpcServer.ShortenerServer
+	httpHandlersInstance *httpHandlers.Handlers
 )
 
 // printBuildInfo выводит информацию о версии, дате сборки и коммите
@@ -72,6 +80,11 @@ func run() error {
 		return fmt.Errorf("failed to create URL service: %w", err)
 	}
 
+	// Создаем сервисы
+	shortenerService = service.New(cfg, urlStore, urlService.Repo)
+	grpcSrv = grpcServer.New(shortenerService)
+	httpHandlersInstance = httpHandlers.New(shortenerService)
+
 	loggerInstance, err := zap.NewProduction()
 	if err != nil {
 		return fmt.Errorf("failed to create logger: %w", err)
@@ -84,19 +97,19 @@ func run() error {
 	r.Use(compress.GzipCompress)
 	r.Use(logger.WithLogging(loggerInstance))
 
-	r.Post("/", urlService.ShortenURL)
-	r.Post("/api/shorten", urlService.ShortenURLJSON)
+	r.Post("/", httpHandlersInstance.ShortenURL)
+	r.Post("/api/shorten", httpHandlersInstance.ShortenURLJSON)
 	r.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
-		urlService.RedirectURL(w, r, chi.URLParam(r, "id"))
+		httpHandlersInstance.RedirectURL(w, r, chi.URLParam(r, "id"))
 	})
-	r.Get("/ping", urlService.Ping)
-	r.Post("/api/shorten/batch", urlService.ShortenURLBatch)
-	r.Get("/api/user/urls", urlService.GetUserURLs)
-	r.Delete("/api/user/urls", urlService.DeleteUserURLs)
+	r.Get("/ping", httpHandlersInstance.Ping)
+	r.Post("/api/shorten/batch", httpHandlersInstance.ShortenURLBatch)
+	r.Get("/api/user/urls", httpHandlersInstance.GetUserURLs)
+	r.Delete("/api/user/urls", httpHandlersInstance.DeleteUserURLs)
 
 	r.Route("/api/internal", func(r chi.Router) {
 		r.Use(middleware.TrustedSubnetMiddleware(cfg))
-		r.Get("/stats", urlService.GetStats)
+		r.Get("/stats", httpHandlersInstance.GetStats)
 	})
 
 	protocol := "HTTP"
@@ -130,7 +143,23 @@ func run() error {
 		}
 	}()
 
-	// Запуск основного сервера
+	// Запуск gRPC сервера
+	grpcListener, err := net.Listen("tcp", cfg.GRPCServerAddress)
+	if err != nil {
+		loggerInstance.Info("gRPC server disabled", zap.Error(err))
+	} else {
+		grpcServerInstance := grpc.NewServer()
+		grpcSrv.RegisterService(grpcServerInstance)
+
+		go func() {
+			loggerInstance.Info("Starting gRPC server", zap.String("address", cfg.GRPCServerAddress))
+			if err := grpcServerInstance.Serve(grpcListener); err != nil {
+				loggerInstance.Error("gRPC server error", zap.Error(err))
+			}
+		}()
+	}
+
+	// Запуск основного HTTP сервера
 	serverErr := make(chan error, 1)
 	go func() {
 		var err error
@@ -184,7 +213,9 @@ func run() error {
 }
 
 func main() {
+	fmt.Println("Starting application...")
 	if err := run(); err != nil {
+		fmt.Printf("Error: %v\n", err)
 		log.Fatal(err)
 	}
 }

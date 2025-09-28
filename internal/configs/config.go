@@ -12,12 +12,13 @@ import (
 
 // JSONConfig структура для загрузки конфигурации из JSON файла
 type JSONConfig struct {
-	ServerAddress   string `json:"server_address"`
-	BaseURL         string `json:"base_url"`
-	FileStoragePath string `json:"file_storage_path"`
-	DatabaseDSN     string `json:"database_dsn"`
-	EnableHTTPS     bool   `json:"enable_https"`
-	TrustedSubnet   string `json:"trusted_subnet"`
+	ServerAddress     string `json:"server_address"`
+	GRPCServerAddress string `json:"grpc_server_address"`
+	BaseURL           string `json:"base_url"`
+	FileStoragePath   string `json:"file_storage_path"`
+	DatabaseDSN       string `json:"database_dsn"`
+	EnableHTTPS       bool   `json:"enable_https"`
+	TrustedSubnet     string `json:"trusted_subnet"`
 }
 
 // loadJSONConfig загружает конфигурацию из JSON файла
@@ -42,13 +43,14 @@ func loadJSONConfig(filename string) (*JSONConfig, error) {
 // Config содержит настройки приложения
 // Может быть загружен из переменных окружения, флагов командной строки или JSON файла
 type Config struct {
-	ServerAddress   string `env:"SERVER_ADDRESS" envDefault:"localhost:8080"`        // Адрес HTTP сервера
-	BaseURL         string `env:"BASE_URL" envDefault:"http://localhost:8080/"`      // Базовый URL для сокращённых ссылок
-	FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"./url_storage.json"` // Путь к файлу хранилища
-	DatabaseDSN     string `env:"DATABASE_DSN" envDefault:""`                        // DSN для подключения к БД
-	EnableHTTPS     bool   `env:"ENABLE_HTTPS" envDefault:"false"`                   // Включить HTTPS
-	TrustedSubnet   string `env:"TRUSTED_SUBNET" envDefault:""`                      // Доверенная подсеть для внутренних эндпоинтов
-	ConfigFile      string `env:"CONFIG" envDefault:""`                              // Путь к JSON файлу конфигурации
+	ServerAddress     string `env:"SERVER_ADDRESS" envDefault:"localhost:8080"`        // Адрес HTTP сервера
+	GRPCServerAddress string `env:"GRPC_SERVER_ADDRESS" envDefault:"localhost:8081"`   // Адрес gRPC сервера
+	BaseURL           string `env:"BASE_URL" envDefault:"http://localhost:8080/"`      // Базовый URL для сокращённых ссылок
+	FileStoragePath   string `env:"FILE_STORAGE_PATH" envDefault:"./url_storage.json"` // Путь к файлу хранилища
+	DatabaseDSN       string `env:"DATABASE_DSN" envDefault:""`                        // DSN для подключения к БД
+	EnableHTTPS       bool   `env:"ENABLE_HTTPS" envDefault:"false"`                   // Включить HTTPS
+	TrustedSubnet     string `env:"TRUSTED_SUBNET" envDefault:""`                      // Доверенная подсеть для внутренних эндпоинтов
+	ConfigFile        string `env:"CONFIG" envDefault:""`                              // Путь к JSON файлу конфигурации
 }
 
 // LoadConfig используется для загрузки конфига
@@ -60,6 +62,7 @@ func LoadConfig() (*Config, error) {
 	}
 
 	addressFlag := flag.String("a", "", "HTTP server address (host:port)")
+	grpcAddressFlag := flag.String("g", "", "gRPC server address (host:port)")
 	baseURLFlag := flag.String("b", "", "Base URL for shortened links")
 	fileStorageFlag := flag.String("f", "", "Path to file storage")
 	databaseFlag := flag.String("d", "", "Database connection string")
@@ -90,6 +93,9 @@ func LoadConfig() (*Config, error) {
 		if jsonConfig.ServerAddress != "" {
 			cfg.ServerAddress = jsonConfig.ServerAddress
 		}
+		if jsonConfig.GRPCServerAddress != "" {
+			cfg.GRPCServerAddress = jsonConfig.GRPCServerAddress
+		}
 		if jsonConfig.BaseURL != "" {
 			cfg.BaseURL = jsonConfig.BaseURL
 		}
@@ -110,6 +116,9 @@ func LoadConfig() (*Config, error) {
 	// Применяем флаги командной строки (они имеют наивысший приоритет)
 	if *addressFlag != "" {
 		cfg.ServerAddress = *addressFlag
+	}
+	if *grpcAddressFlag != "" {
+		cfg.GRPCServerAddress = *grpcAddressFlag
 	}
 	if *baseURLFlag != "" {
 		cfg.BaseURL = *baseURLFlag
