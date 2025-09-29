@@ -1,0 +1,130 @@
+syntax = "proto3";
+
+package shortener;
+
+option go_package = "github.com/Evgen-Mutagen/go-shortener-url/api";
+
+// ShortenerService предоставляет методы для работы с сокращением URL
+service ShortenerService {
+  // ShortenURL сокращает URL и возвращает короткую ссылку
+  rpc ShortenURL(ShortenURLRequest) returns (ShortenURLResponse);
+  
+  // GetURL возвращает оригинальный URL по короткому ID
+  rpc GetURL(GetURLRequest) returns (GetURLResponse);
+  
+  // ShortenURLBatch пакетное сокращение URL
+  rpc ShortenURLBatch(ShortenURLBatchRequest) returns (ShortenURLBatchResponse);
+  
+  // GetUserURLs возвращает все URL пользователя
+  rpc GetUserURLs(GetUserURLsRequest) returns (GetUserURLsResponse);
+  
+  // DeleteUserURLs помечает URL как удаленные
+  rpc DeleteUserURLs(DeleteUserURLsRequest) returns (DeleteUserURLsResponse);
+  
+  // Ping проверяет доступность сервиса
+  rpc Ping(PingRequest) returns (PingResponse);
+  
+  // GetStats возвращает статистику сервиса
+  rpc GetStats(GetStatsRequest) returns (GetStatsResponse);
+}
+
+// ShortenURLRequest запрос на сокращение URL
+message ShortenURLRequest {
+  string url = 1;
+  string user_id = 2;
+}
+
+// ShortenURLResponse ответ на сокращение URL
+message ShortenURLResponse {
+  string short_url = 1;
+  string error = 2;
+  int32 status_code = 3;
+}
+
+// GetURLRequest запрос на получение оригинального URL
+message GetURLRequest {
+  string id = 1;
+}
+
+// GetURLResponse ответ с оригинальным URL
+message GetURLResponse {
+  string original_url = 1;
+  bool is_deleted = 2;
+  string error = 3;
+  int32 status_code = 4;
+}
+
+// BatchItem элемент пакетного запроса
+message BatchItem {
+  string correlation_id = 1;
+  string original_url = 2;
+}
+
+// ShortenURLBatchRequest запрос на пакетное сокращение URL
+message ShortenURLBatchRequest {
+  repeated BatchItem items = 1;
+  string user_id = 2;
+}
+
+// BatchResponseItem элемент ответа на пакетный запрос
+message BatchResponseItem {
+  string correlation_id = 1;
+  string short_url = 2;
+}
+
+// ShortenURLBatchResponse ответ на пакетное сокращение URL
+message ShortenURLBatchResponse {
+  repeated BatchResponseItem items = 1;
+  string error = 2;
+  int32 status_code = 3;
+}
+
+// GetUserURLsRequest запрос на получение URL пользователя
+message GetUserURLsRequest {
+  string user_id = 1;
+}
+
+// UserURL элемент URL пользователя
+message UserURL {
+  string short_url = 1;
+  string original_url = 2;
+}
+
+// GetUserURLsResponse ответ с URL пользователя
+message GetUserURLsResponse {
+  repeated UserURL urls = 1;
+  string error = 2;
+  int32 status_code = 3;
+}
+
+// DeleteUserURLsRequest запрос на удаление URL пользователя
+message DeleteUserURLsRequest {
+  repeated string url_ids = 1;
+  string user_id = 2;
+}
+
+// DeleteUserURLsResponse ответ на удаление URL
+message DeleteUserURLsResponse {
+  string error = 1;
+  int32 status_code = 2;
+}
+
+// PingRequest запрос проверки доступности
+message PingRequest {}
+
+// PingResponse ответ на проверку доступности
+message PingResponse {
+  string error = 1;
+  int32 status_code = 2;
+}
+
+// GetStatsRequest запрос статистики
+message GetStatsRequest {}
+
+// GetStatsResponse ответ со статистикой
+message GetStatsResponse {
+  int32 urls = 1;
+  int32 users = 2;
+  string error = 3;
+  int32 status_code = 4;
+}
